@@ -1,0 +1,234 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── CSS Custom Properties ───────────────────────────── */
+:root {
+  /* Dark Theme (Default) */
+  --bg-primary: #0a0a0a;
+  --bg-secondary: #1a1a2e;
+  --bg-forest: #0d1f0d;
+  --color-gold: #FFB800;
+  --color-gold-glow: rgba(255, 184, 0, 0.3);
+  --color-neon-green: #00D9A0;
+  --color-red: #FF6B6B;
+  --color-purple: #9F7AEA;
+  --text-primary: #FFFFFF;
+  --text-secondary: #A0A0A0;
+  --card-bg: rgba(255, 255, 255, 0.03);
+  --card-border: rgba(255, 255, 255, 0.08);
+  --bg-gradient: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%);
+  --accent-gradient: linear-gradient(135deg, #FACC15 0%, #EAB308 100%);
+  --glass-bg: rgba(255, 255, 255, 0.03);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+.light {
+  --bg-primary: #F8FAFC;
+  --bg-secondary: #EFF3F8;
+  --bg-forest: #E2ECF5;
+  --text-primary: #0F172A;
+  --text-secondary: #4A5568;
+  --card-bg: rgba(255, 255, 255, 0.85);
+  --card-border: rgba(15, 23, 42, 0.10);
+  --color-gold: #D97706;
+  --color-gold-glow: rgba(217, 119, 6, 0.35);
+  --color-neon-green: #059669;
+  --color-red: #DC2626;
+  --color-purple: #7C3AED;
+  --bg-gradient: linear-gradient(135deg, #F8FAFC 0%, #EFF3F8 50%, #E2ECF5 100%);
+  --accent-gradient: linear-gradient(135deg, #FACC15 0%, #D97706 100%);
+  --glass-bg: rgba(255, 255, 255, 0.80);
+  --glass-border: rgba(15, 23, 42, 0.08);
+}
+
+/* ─── Base Reset ──────────────────────────────────────── */
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-family);
+  background: var(--bg-gradient);
+  color: var(--text-primary);
+  min-height: 100vh;
+  overflow-x: hidden;
+  cursor: none;
+  transition: background 0.5s ease;
+}
+
+/* ─── Glassmorphism Utility ───────────────────────────── */
+.glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.05);
+}
+
+.premium-gradient {
+  background: var(--accent-gradient);
+  color: #000000;
+  box-shadow: 0 10px 25px -5px rgba(250, 204, 21, 0.4);
+}
+
+.light .premium-gradient {
+  box-shadow: 0 10px 25px -5px rgba(234, 179, 8, 0.2);
+}
+
+.glass-hover:hover {
+  border-color: var(--color-gold);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+}
+
+.light .glass-hover:hover {
+  box-shadow: 0 8px 32px rgba(15, 23, 42, 0.08);
+}
+
+/* ─── Gold Glow Utility ───────────────────────────────── */
+.glow-gold {
+  box-shadow: 0 0 20px var(--color-gold-glow);
+}
+
+.glow-gold-hover:hover {
+  box-shadow: 0 0 30px rgba(255, 184, 0, 0.5);
+}
+
+/* ─── Animated Underline for Nav Links ────────────────── */
+.nav-link {
+  position: relative;
+  color: var(--text-secondary);
+  transition: color 0.3s ease;
+}
+
+.nav-link::after {
+  content: '';
+  position: absolute;
+  bottom: -4px;
+  left: 0;
+  width: 0;
+  height: 2px;
+  background: var(--color-gold);
+  transition: width 0.3s ease;
+}
+
+.nav-link:hover {
+  color: var(--text-primary);
+}
+
+.nav-link:hover::after {
+  width: 100%;
+}
+
+/* ─── Keyframe Animations ─────────────────────────────── */
+@keyframes pulse-dot {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.5);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ─── Utility Classes ─────────────────────────────────── */
+.animate-pulse-dot {
+  animation: pulse-dot 2s infinite;
+}
+
+.animate-shimmer {
+  background: linear-gradient(90deg, var(--card-bg) 25%, var(--card-border) 50%, var(--card-bg) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.6s ease-out forwards;
+}
+
+/* ─── Skeleton Loading ────────────────────────────────── */
+.skeleton {
+  background: linear-gradient(90deg, var(--card-bg) 25%, var(--card-border) 50%, var(--card-bg) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+  border-radius: 8px;
+}
+
+/* ─── Selection ───────────────────────────────────────── */
+::selection {
+  background: var(--color-gold);
+  color: var(--bg-primary);
+}
+
+/* ─── Scrollbar ───────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-gold-glow);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-gold);
+}
+
+/* ─── Reduced Motion ──────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
