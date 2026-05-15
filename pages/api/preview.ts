@@ -46,11 +46,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           preview = parsed.slice(0, 5);
         } else if (typeof parsed === 'object' && parsed !== null) {
           const keys = Object.keys(parsed).slice(0, 5);
-          preview = {};
-          keys.forEach((k: string) => { (preview as any)[k] = parsed[k]; });
+          const preview: Record<string, unknown> = {};
+          keys.forEach((k: string) => { preview[k] = (parsed as Record<string, unknown>)[k]; });
         }
         return res.status(200).json({ type: 'json', data: preview });
-      } catch (e) {
+      } catch {
         return res.status(400).json({ error: 'PARSE_ERROR', message: 'El contenido no es un JSON válido' });
       }
     } else if (type === 'txt') {

@@ -55,8 +55,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       faqsApproved
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error fetching stats:', error);
-    return res.status(500).json({ error: 'INTERNAL_ERROR', message: error.message });
+    return res.status(500).json({ error: 'INTERNAL_ERROR', message: error instanceof Error ? error.message : 'Unknown error' });
   }
 }

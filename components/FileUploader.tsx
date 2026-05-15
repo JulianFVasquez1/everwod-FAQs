@@ -104,11 +104,11 @@ export default function FileUploader() {
       setObservations('');
       if (fileInputRef.current) fileInputRef.current.value = '';
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       // 5. Error
       setUploadState({
         status: 'error',
-        message: error.message || 'Ocurrió un error de conexión',
+        message: error instanceof Error ? error.message : 'Ocurrió un error de conexión',
       });
     }
   };

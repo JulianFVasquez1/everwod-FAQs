@@ -73,8 +73,9 @@ Conversaciones: ${content.substring(0, 100000)}`;
       const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
       const result = await model.generateContent(prompt);
       aiText = result.response.text();
-    } catch (e: any) {
-      if (e.status === 503 || e.message?.includes('503') || e.message?.includes('Service Unavailable')) {
+    } catch (e: unknown) {
+      const err = e as { status?: number; message?: string };
+      if (err.status === 503 || err.message?.includes('503') || err.message?.includes('Service Unavailable')) {
         console.warn('gemini-2.5-flash unavailable (503), falling back to gemini-2.0-flash');
         const fallbackModel = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
         const fallbackResult = await fallbackModel.generateContent(prompt);
@@ -107,8 +108,8 @@ Conversaciones: ${content.substring(0, 100000)}`;
     await supabaseAdmin.from('files').update({ faq_generated: true }).eq('id', fileId);
 
     return res.status(200).json({ success: true, count: faqsToInsert.length });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error generating FAQs:', error);
-    return res.status(500).json({ error: 'INTERNAL_ERROR', message: error.message || 'Error al generar FAQs' });
+    return res.status(500).json({ error: 'INTERNAL_ERROR', message: error instanceof Error ? error.message : 'Error al generar FAQs' });
   }
 }

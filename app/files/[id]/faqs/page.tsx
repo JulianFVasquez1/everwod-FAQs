@@ -1,15 +1,15 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+
 import AuthGuard from '../../../../components/AuthGuard';
 import { getSession } from '../../../../lib/auth';
 import { FAQRecord } from '../../../../lib/types';
 
 export default function FileFAQsPage({ params }: { params: { id: string } }) {
   const fileId = params.id;
-  const router = useRouter();
+
 
   const [faqs, setFaqs] = useState<FAQRecord[]>([]);
   const [counts, setCounts] = useState({ pending: 0, approved: 0, edited: 0, rejected: 0 });
@@ -20,7 +20,7 @@ export default function FileFAQsPage({ params }: { params: { id: string } }) {
   const [editAnswer, setEditAnswer] = useState('');
   const [faqGenerated, setFaqGenerated] = useState(true); // Assume true initially
 
-  const fetchFaqs = async () => {
+  const fetchFaqs = useCallback(async () => {
     setLoading(true);
     try {
       const session = await getSession();
@@ -49,11 +49,11 @@ export default function FileFAQsPage({ params }: { params: { id: string } }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [fileId]);
 
   useEffect(() => {
     fetchFaqs();
-  }, [fileId]);
+  }, [fetchFaqs]);
 
   const handleGenerate = async () => {
     setGenerating(true);
@@ -90,7 +90,7 @@ export default function FileFAQsPage({ params }: { params: { id: string } }) {
       const session = await getSession();
       if (!session) return;
       
-      const body: any = { status };
+      const body: Record<string, string> = { status };
       if (question) body.question = question;
       if (answer) body.answer = answer;
 

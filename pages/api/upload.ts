@@ -169,10 +169,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     }
 
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error en el endpoint de subida:', error);
     // Atrapamos un error en particular de formidable para límite de tamaño
-    if (error.code === 1009) { 
+    if (error instanceof Error && (error as { code?: number }).code === 1009) { 
       return res.status(400).json({ error: 'FILE_TOO_LARGE', message: 'El archivo excede el tamaño máximo permitido' });
     }
     return res.status(500).json({ error: 'INTERNAL_SERVER_ERROR', message: 'Ocurrió un error inesperado en el servidor' });

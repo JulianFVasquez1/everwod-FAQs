@@ -5,7 +5,7 @@ import React, { useState } from 'react';
 type PreviewData = {
   type: string;
   lines?: string[];
-  data?: any;
+  data?: unknown;
 };
 
 export default function FilePreview({ fileId, type }: { fileId: string; type: string }) {
@@ -33,8 +33,8 @@ export default function FilePreview({ fileId, type }: { fileId: string; type: st
       }
       
       setPreview(data);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Error desconocido');
     } finally {
       setLoading(false);
     }

@@ -41,7 +41,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     };
 
     return res.status(200).json({ faqs, counts });
-  } catch (error: any) {
-    return res.status(500).json({ error: 'INTERNAL_ERROR', message: error.message });
+  } catch (error: unknown) {
+    return res.status(500).json({ error: 'INTERNAL_ERROR', message: error instanceof Error ? error.message : 'Unknown error' });
   }
 }

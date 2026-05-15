@@ -20,7 +20,7 @@ interface SceneProps extends Polyhedron3DProps {
   isLight: boolean;
 }
 
-function PolyhedronScene({ stats, compact, themeColor, isLight }: SceneProps) {
+function PolyhedronScene({ stats, themeColor, isLight }: SceneProps) {
   const meshRef = useRef<THREE.Mesh>(null);
   const glowRef = useRef<THREE.Mesh>(null);
   const particlesRef = useRef<THREE.Points>(null);

@@ -42,9 +42,9 @@ export default function FileDetailPage({ params }: { params: { id: string } }) {
 
         const data = await res.json();
         setFile(data);
-      } catch (err: any) {
+      } catch (err: unknown) {
         console.error('Fetch error:', err);
-        setError(err.message || 'Error de Conexión');
+        setError(err instanceof Error ? err.message : 'Error de Conexión');
       } finally {
         setLoading(false);
       }
@@ -142,7 +142,7 @@ export default function FileDetailPage({ params }: { params: { id: string } }) {
                 <div className="py-4 sm:py-6 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-8 hover:bg-white/5 transition-colors">
                   <dt className="text-sm font-semibold text-white/40">Observaciones</dt>
                   <dd className="mt-1 text-sm text-white/80 sm:mt-0 sm:col-span-2 italic border-l-2 border-[#FACC15]/50 pl-3">
-                    "{file.observations}"
+                    &quot;{file.observations}&quot;
                   </dd>
                 </div>
               )}
