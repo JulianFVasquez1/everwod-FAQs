@@ -139,6 +139,28 @@ export interface Workspace {
   suggestions_total: number
   suggestions_pending: number
   last_suggestion_at: string | null
+  last_pipeline_run?: PipelineRun | null
+}
+
+export interface WorkspaceCategoryStat {
+  category: string
+  count: number
+}
+
+export interface WorkspaceStatusStat {
+  pending: number
+  approved: number
+  rejected: number
+  edited: number
+}
+
+export interface WorkspaceDetail {
+  workspace_id: number
+  workspace_name: string | null
+  suggestions_total: number
+  suggestions_by_status: WorkspaceStatusStat
+  top_categories: WorkspaceCategoryStat[]
+  last_pipeline_run: PipelineRun | null
 }
 
 // ── Health ─────────────────────────────────────────────────────────────
@@ -147,12 +169,39 @@ export interface HealthStatus {
   db: 'ok' | 'down'
   environment: string
   version: string
+  last_successful_run_at: string | null
+  scheduler_next_run_at: string | null
+  hf_inference_reachable: boolean | null
+}
+
+// ── Bulk review ────────────────────────────────────────────────────────
+export interface BulkReviewPayload {
+  suggestion_ids: number[]
+  action: 'approve' | 'reject'
+  reviewer: string
+  notes?: string
+  rejection_reason?: RejectionReason
+}
+
+export interface BulkReviewItemResult {
+  suggestion_id: number
+  success: boolean
+  status?: string | null
+  error?: string | null
+}
+
+export interface BulkReviewResponse {
+  processed: number
+  successful: number
+  failed: number
+  results: BulkReviewItemResult[]
 }
 
 // ── Parámetros de listado ──────────────────────────────────────────────
 export interface GetSuggestionsParams {
   page?: number
   limit?: number
+  cursor?: string
   sort?: SortOption
   status?: SuggestionStatus
   workspace_id?: number
@@ -194,6 +243,24 @@ export interface RunPipelineResponse {
 }
 
 // ── Respuesta estándar de la API (envelope) ────────────────────────────
+export interface OffsetPagination {
+  page: number
+  limit: number
+  total: number
+  pages: number
+}
+
+export interface CursorPagination {
+  next_cursor: string | null
+  limit: number
+}
+
+export type Pagination = OffsetPagination | CursorPagination
+
+export function isCursorPagination(p: Pagination | undefined | null): p is CursorPagination {
+  return !!p && 'next_cursor' in p
+}
+
 export interface DetectorResponse<T> {
   ok: boolean
   data: T
@@ -203,10 +270,5 @@ export interface DetectorResponse<T> {
     message: string
     details?: unknown[]
   }
-  pagination?: {
-    page: number
-    limit: number
-    total: number
-    pages: number
-  }
+  pagination?: Pagination
 }

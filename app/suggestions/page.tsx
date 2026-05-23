@@ -1,15 +1,15 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { useSuggestions, useSuggestionActions } from '@/hooks/useDetector'
+import { useSuggestions, useSuggestionActions, useBulkSuggestionActions } from '@/hooks/useDetector'
 import { detectorClient, type Suggestion, type SuggestionStatus } from '@/lib/detector'
 import { SuggestionCard } from '@/components/detector/SuggestionCard'
 import { SkeletonCard } from '@/components/detector/SkeletonCard'
 import { ApproveModal } from '@/components/detector/ApproveModal'
 import { RejectModal } from '@/components/detector/RejectModal'
 import { WorkspaceSelect } from '@/components/detector/WorkspaceSelect'
-import { getUser } from '@/lib/auth'
+import { getUser, getSession } from '@/lib/auth'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
@@ -28,6 +28,8 @@ export default function SuggestionsPage() {
   const [userEmail, setUserEmail] = useState<string | null>(null)
   const [analysisLoading, setAnalysisLoading] = useState(false)
   const [workspaceId, setWorkspaceId] = useState<number | null>(null)
+  const [selectMode, setSelectMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
 
   const { suggestions, loading, error, total, params, setParams, refetch } = useSuggestions({
     status: activeStatus === 'all' ? undefined : activeStatus,
@@ -39,6 +41,87 @@ export default function SuggestionsPage() {
     setSelectedSuggestion(null)
     refetch()
   })
+
+  const { run: bulkRun, processing: bulkProcessing } = useBulkSuggestionActions((res) => {
+    alert(`Lote procesado: ${res.successful} OK, ${res.failed} fallidas.`)
+    setSelectedIds(new Set())
+    setSelectMode(false)
+    refetch()
+  })
+
+  const visibleIds = useMemo(() => suggestions.map((s) => s.id), [suggestions])
+  const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.has(id))
+
+  const toggleId = (id: number) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+  const toggleAllVisible = () => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (allVisibleSelected) visibleIds.forEach((id) => next.delete(id))
+      else visibleIds.forEach((id) => next.add(id))
+      return next
+    })
+  }
+  const exitSelectMode = () => {
+    setSelectMode(false)
+    setSelectedIds(new Set())
+  }
+
+  const runBulk = async (action: 'approve' | 'reject') => {
+    if (selectedIds.size === 0) return
+    const verb = action === 'approve' ? 'aprobar' : 'rechazar'
+    if (!confirm(`¿${verb[0].toUpperCase() + verb.slice(1)} ${selectedIds.size} sugerencias?`)) return
+    try {
+      const ids = Array.from(selectedIds)
+      const result = await bulkRun({
+        suggestion_ids: ids,
+        action,
+        reviewer: userEmail || 'agente-everwod',
+        ...(action === 'reject' ? { rejection_reason: 'low_quality' as const } : {}),
+      })
+
+      // Si fue approve, sincronizar las exitosas con la tabla `faqs` local de Supabase
+      // (mismo paso B que hace el approve individual en useSuggestionActions)
+      if (action === 'approve' && result) {
+        const successIds = new Set(
+          result.results.filter((r) => r.success).map((r) => r.suggestion_id)
+        )
+        const session = await getSession()
+        const approvedSuggs = suggestions.filter((s) => successIds.has(s.id))
+
+        await Promise.allSettled(
+          approvedSuggs.map((sug) =>
+            fetch('/api/faqs', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                Authorization: `Bearer ${session?.access_token ?? ''}`,
+              },
+              body: JSON.stringify({
+                question: sug.suggested_question,
+                answer: sug.suggested_answer,
+                status: 'approved',
+                source: 'ai_detector',
+                metadata: {
+                  suggestion_id: sug.id,
+                  reviewer: userEmail || 'agente-everwod',
+                  bulk: true,
+                },
+              }),
+            })
+          )
+        )
+      }
+    } catch {
+      // bulkRun ya setea error; el alert lo maneja el onSuccess del hook
+    }
+  }
 
   useEffect(() => {
     getUser().then(user => setUserEmail(user?.email || null))
@@ -61,10 +144,13 @@ export default function SuggestionsPage() {
     }
     setAnalysisLoading(true)
     try {
-      await detectorClient.runPipeline({
-        since: '2025-01-01',
-        workspace_id: workspaceId,
-      })
+      const idempotencyKey = (typeof crypto !== 'undefined' && 'randomUUID' in crypto)
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(36).slice(2)}`
+      await detectorClient.runPipeline(
+        { since: '2025-01-01', workspace_id: workspaceId },
+        { idempotencyKey }
+      )
       alert('Análisis iniciado correctamente. Los resultados aparecerán en unos minutos.')
     } catch (e) {
       alert('Error al iniciar análisis: ' + (e instanceof Error ? e.message : 'Desconocido'))
@@ -132,7 +218,18 @@ export default function SuggestionsPage() {
         </div>
         
         <div className="flex-1" />
-        
+
+        <button
+          onClick={() => (selectMode ? exitSelectMode() : setSelectMode(true))}
+          className={`px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-widest border transition-colors ${
+            selectMode
+              ? 'bg-gold/20 text-gold border-gold/40'
+              : 'bg-white/5 text-secondary border-card-border hover:text-primary'
+          }`}
+        >
+          {selectMode ? 'Cancelar selección' : 'Modo selección'}
+        </button>
+
         <div className="text-sm text-secondary">
           {total} sugerencias encontradas
         </div>
@@ -189,7 +286,23 @@ export default function SuggestionsPage() {
                   animate={{ scale: 1, opacity: 1 }}
                   exit={{ scale: 0.9, opacity: 0 }}
                   transition={{ duration: 0.2 }}
+                  className="relative"
                 >
+                  {selectMode && (
+                    <button
+                      onClick={() => toggleId(sug.id)}
+                      className={`absolute top-3 right-3 z-10 w-6 h-6 rounded-md border-2 flex items-center justify-center transition-colors ${
+                        selectedIds.has(sug.id)
+                          ? 'bg-gold border-gold text-black'
+                          : 'bg-black/60 border-white/30 text-transparent hover:border-gold'
+                      }`}
+                      aria-label={selectedIds.has(sug.id) ? 'Deseleccionar' : 'Seleccionar'}
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
+                      </svg>
+                    </button>
+                  )}
                   <SuggestionCard
                     suggestion={sug}
                     onApprove={() => openModal(sug, 'approve')}
@@ -222,6 +335,43 @@ export default function SuggestionsPage() {
           </div>
         )}
       </div>
+
+      {/* Barra de acciones en lote (sticky) */}
+      <AnimatePresence>
+        {selectMode && (
+          <motion.div
+            initial={{ y: 80, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 80, opacity: 0 }}
+            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 glass border-card-border shadow-2xl px-6 py-4 flex items-center gap-4"
+          >
+            <button
+              onClick={toggleAllVisible}
+              className="text-xs font-bold uppercase tracking-widest text-secondary hover:text-primary"
+            >
+              {allVisibleSelected ? 'Deseleccionar visibles' : 'Seleccionar visibles'}
+            </button>
+            <span className="text-sm font-bold text-primary">
+              {selectedIds.size} seleccionadas
+            </span>
+            <div className="h-6 w-px bg-white/10" />
+            <button
+              onClick={() => runBulk('reject')}
+              disabled={selectedIds.size === 0 || bulkProcessing}
+              className="px-4 py-2 rounded-lg bg-red-500/10 text-red-400 border border-red-500/20 font-bold text-sm hover:bg-red-500/20 disabled:opacity-40"
+            >
+              ✗ Rechazar {selectedIds.size > 0 ? selectedIds.size : ''}
+            </button>
+            <button
+              onClick={() => runBulk('approve')}
+              disabled={selectedIds.size === 0 || bulkProcessing}
+              className="px-4 py-2 rounded-lg premium-gradient text-black font-bold text-sm disabled:opacity-40"
+            >
+              {bulkProcessing ? 'Procesando…' : `✓ Aprobar ${selectedIds.size > 0 ? selectedIds.size : ''}`}
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Modales */}
       {modalType === 'approve' && (

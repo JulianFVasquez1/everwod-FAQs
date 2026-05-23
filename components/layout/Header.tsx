@@ -16,9 +16,21 @@ export default function Header() {
     online === null ? 'Verificando…' : online ? 'Detector activo' : 'Detector caído';
   const statusColor =
     online === null ? '#FACC15' : online ? '#00D9A0' : '#FF4D4D';
-  const statusTitle = lastCheckedAt
-    ? `Último check: ${lastCheckedAt.toLocaleTimeString()}${health?.version ? ` · v${health.version}` : ''}`
-    : 'Verificando estado del detector';
+  const statusTitle = (() => {
+    if (!lastCheckedAt) return 'Verificando estado del detector';
+    const lines: string[] = [`Último check: ${lastCheckedAt.toLocaleTimeString()}`];
+    if (health?.version) lines.push(`Versión: ${health.version}`);
+    if (health?.last_successful_run_at) {
+      lines.push(`Última corrida: ${new Date(health.last_successful_run_at).toLocaleString()}`);
+    }
+    if (health?.scheduler_next_run_at) {
+      lines.push(`Próxima corrida: ${new Date(health.scheduler_next_run_at).toLocaleString()}`);
+    }
+    if (health?.hf_inference_reachable !== null && health?.hf_inference_reachable !== undefined) {
+      lines.push(`HF Inference: ${health.hf_inference_reachable ? 'reachable' : 'down'}`);
+    }
+    return lines.join('\n');
+  })();
 
   const navLinks = [
     { href: '/upload', label: 'Subir' },
