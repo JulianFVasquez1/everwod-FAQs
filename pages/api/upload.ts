@@ -8,7 +8,7 @@ import fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
 import { fromFile } from 'file-type';
 
-import { supabaseAdmin } from '../../lib/supabase';
+import { supabaseAdmin, verifyToken } from '../../lib/supabase';
 import {
   ALLOWED_TYPES,
   AllowedType,
@@ -58,7 +58,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(401).json({ error: 'UNAUTHORIZED', message: 'No se proporcionó token de autenticación' });
     }
     const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    const { user, error: authError } = await verifyToken(token);
     
     if (authError || !user) {
       return res.status(401).json({ error: 'UNAUTHORIZED', message: 'Token de autenticación inválido o expirado' });

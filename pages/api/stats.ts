@@ -1,5 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { supabaseAdmin } from '../../lib/supabase';
+import { supabaseAdmin, verifyToken } from '../../lib/supabase';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -11,10 +11,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(401).json({ error: 'UNAUTHORIZED', message: 'No autorizado' });
   }
   const token = authHeader.split(' ')[1];
-  const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+  const { user, error: authError } = await verifyToken(token);
   if (authError || !user) {
-    console.error("Auth error:", authError);
-    return res.status(401).json({ error: 'UNAUTHORIZED', message: 'Token inválido', details: authError?.message });
+    return res.status(401).json({ error: 'UNAUTHORIZED', message: 'Token inválido' });
   }
 
   try {

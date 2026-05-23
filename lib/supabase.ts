@@ -14,3 +14,16 @@ export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey, {
     persistSession: false,
   },
 });
+
+/**
+ * Verifica un token JWT de Supabase usando la anon key (compatible con nuevas claves sb_publishable_*)
+ */
+export async function verifyToken(token: string) {
+  const anonClient = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { auth: { autoRefreshToken: false, persistSession: false } }
+  );
+  const { data: { user }, error } = await anonClient.auth.getUser(token);
+  return { user, error };
+}

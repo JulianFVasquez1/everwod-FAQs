@@ -27,6 +27,31 @@ export default function FileUploader() {
     message: '',
   });
 
+  // Estado para drag and drop
+  const [isDragOver, setIsDragOver] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    if (!isProcessing) setIsDragOver(true);
+  };
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+  };
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    if (!isProcessing && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      setSelectedFile(e.dataTransfer.files[0]);
+    }
+  };
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      setSelectedFile(e.target.files[0]);
+    }
+  };
+
   const getExtension = (filename: string) => {
     const parts = filename.split('.');
     return parts.length > 1 ? parts.pop()!.toLowerCase() : '';
@@ -38,7 +63,7 @@ export default function FileUploader() {
     // 1. Validaciones del lado del cliente
     setUploadState({ status: 'validating', message: 'Validando archivo...' });
 
-    const file = fileInputRef.current?.files?.[0];
+    const file = selectedFile || fileInputRef.current?.files?.[0];
 
     if (!file) {
       setUploadState({ status: 'error', message: 'Por favor selecciona un archivo.' });
@@ -102,6 +127,7 @@ export default function FileUploader() {
       // Limpiamos el formulario en caso de éxito
       setGroup('');
       setObservations('');
+      setSelectedFile(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
 
     } catch (error: unknown) {
@@ -152,28 +178,60 @@ export default function FileUploader() {
             <label htmlFor="file" className="block text-sm font-semibold text-secondary mb-1">
               Archivo <span className="text-red-500">*</span>
             </label>
-            <div className="mt-1 flex justify-center px-6 pt-8 pb-8 border-2 border-card-border border-dashed rounded-xl bg-white/5 hover:bg-white/10 transition-colors group/upload">
-              <div className="space-y-2 text-center">
-                <svg className="mx-auto h-12 w-12 text-secondary/30 transition-transform group-hover/upload:scale-110" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
-                  <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-                <div className="flex text-sm text-secondary/60 justify-center">
-                  <label htmlFor="file" className="relative cursor-pointer bg-transparent rounded-md font-bold text-[#FFB800] hover:text-[#FFB800]-hover focus-within:outline-none transition-colors">
-                    <span>Sube un archivo</span>
-                    <input
-                      id="file"
-                      name="file"
-                      type="file"
-                      ref={fileInputRef}
-                      accept=".csv,.json,.txt"
+            <div 
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
+              className={`mt-1 flex justify-center px-6 pt-8 pb-8 border-2 border-dashed rounded-xl transition-all group/upload ${
+                isDragOver ? 'border-[#FACC15] bg-[#FACC15]/10 scale-[1.02]' : 
+                selectedFile ? 'border-[#34D399] bg-[#34D399]/10' : 
+                'border-card-border bg-white/5 hover:bg-white/10'
+              }`}
+            >
+              <div className="space-y-2 text-center w-full">
+                {selectedFile ? (
+                  <div className="animate-in fade-in zoom-in duration-300">
+                    <svg className="mx-auto h-12 w-12 text-[#34D399] drop-shadow-[0_0_8px_rgba(52,211,153,0.5)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <div className="text-sm font-bold text-[#34D399] mt-2 truncate w-full max-w-[250px] mx-auto">{selectedFile.name}</div>
+                    <p className="text-xs text-[#34D399]/70 mt-1">{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>
+                    <button 
+                      type="button" 
+                      onClick={() => { setSelectedFile(null); if(fileInputRef.current) fileInputRef.current.value = ''; }} 
                       disabled={isProcessing}
-                      required
-                      className="sr-only"
-                    />
-                  </label>
-                  <p className="pl-1 text-secondary/40">o arrástralo y suéltalo</p>
-                </div>
-                <p className="text-xs text-secondary/30">CSV, JSON, TXT hasta 10MB</p>
+                      className="text-xs text-white/50 hover:text-white mt-3 underline transition-colors disabled:opacity-50"
+                    >
+                      Reemplazar o quitar archivo
+                    </button>
+                    {/* Input invisible solo para mantener la referencia */}
+                    <input type="file" name="file" ref={fileInputRef} className="hidden" />
+                  </div>
+                ) : (
+                  <>
+                    <svg className={`mx-auto h-12 w-12 transition-all duration-300 ${isDragOver ? 'text-[#FACC15] scale-125' : 'text-secondary/30 group-hover/upload:scale-110'}`} stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
+                      <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                    <div className="flex text-sm text-secondary/60 justify-center items-center mt-4">
+                      <label htmlFor="file" className="relative cursor-pointer bg-transparent rounded-md font-bold text-[#FFB800] hover:text-[#FFB800]-hover focus-within:outline-none transition-colors">
+                        <span>Sube un archivo</span>
+                        <input
+                          id="file"
+                          name="file"
+                          type="file"
+                          ref={fileInputRef}
+                          accept=".csv,.json,.txt"
+                          onChange={handleFileChange}
+                          disabled={isProcessing}
+                          required={!selectedFile}
+                          className="sr-only"
+                        />
+                      </label>
+                      <p className="pl-1 text-secondary/40">o arrástralo y suéltalo</p>
+                    </div>
+                    <p className="text-xs text-secondary/30 mt-1">CSV, JSON, TXT hasta 10MB</p>
+                  </>
+                )}
               </div>
             </div>
           </div>

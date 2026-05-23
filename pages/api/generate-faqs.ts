@@ -12,6 +12,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { supabaseAdmin } from '../../lib/supabase';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { getEmbedding, simpleCluster } from '../../lib/nlp/embeddings';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -24,12 +25,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(401).json({ error: 'UNAUTHORIZED', message: 'Token requerido' });
     }
     const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+
+    // Crear cliente temporal con la anon key para verificar el token del usuario
+    const { createClient } = await import('@supabase/supabase-js');
+    const supabaseClient = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token);
     
     if (authError || !user) {
-      console.error("Auth error in generate-faqs:", authError);
-      return res.status(401).json({ error: 'UNAUTHORIZED', message: 'Token inválido', details: authError?.message });
+      return res.status(401).json({ error: 'UNAUTHORIZED', message: 'Token inválido' });
     }
+
 
     const { fileId } = req.body;
     if (!fileId) {
@@ -48,68 +56,75 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     if (file.faq_generated) {
-      return res.status(400).json({ error: 'ALREADY_GENERATED', message: 'Las FAQs ya fueron generadas para este archivo' });
+      return res.status(400).json({ error: 'ALREADY_GENERATED', message: 'Las FAQs ya fueron generadas' });
     }
 
     // Descargar contenido
     const fileRes = await fetch(file.storage_url);
-    if (!fileRes.ok) {
-      return res.status(500).json({ error: 'FETCH_ERROR', message: 'No se pudo descargar el archivo para analizarlo' });
-    }
     const content = await fileRes.text();
 
-    // Llamar a Gemini
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+    // --- PIPELINE DE CLUSTERING ---
+    // Dividir en líneas o párrafos significativos
+    const chunks = content.split('\n').filter(line => line.trim().length > 20).slice(0, 50); // Límite para demo
     
-    const prompt = `Eres un asistente de análisis de conversaciones para Everwod.
-Analiza las siguientes conversaciones y genera entre 5 y 10 preguntas
-frecuentes (FAQs) con sus respuestas sugeridas.
-Responde SOLO con un array JSON con este formato exacto, sin texto adicional:
-[{ "question": "...", "answer": "..." }]
-Conversaciones: ${content.substring(0, 100000)}`;
+    const clusters = simpleCluster(chunks, [], 0.15); // TF-IDF local, no requiere embeddings externos
 
-    let aiText = '';
-    try {
-      const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-      const result = await model.generateContent(prompt);
-      aiText = result.response.text();
-    } catch (e: unknown) {
-      const err = e as { status?: number; message?: string };
-      if (err.status === 503 || err.message?.includes('503') || err.message?.includes('Service Unavailable')) {
-        console.warn('gemini-2.5-flash unavailable (503), falling back to gemini-2.0-flash');
-        const fallbackModel = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-        const fallbackResult = await fallbackModel.generateContent(prompt);
-        aiText = fallbackResult.response.text();
-      } else {
-        throw e;
-      }
-    }
+    // Seleccionar los clusters más grandes o representativos
+    const clusterSummary = clusters
+      .sort((a, b) => b.length - a.length)
+      .slice(0, 10)
+      .map((c, i) => `Patrón ${i+1} (${c.length} menciones):\n${c.join('\n')}`)
+      .join('\n\n');
+
+    // --- GENERACIÓN CON IA ---
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+    const model = genAI.getGenerativeModel({ model: "gemini-3.5-flash" }, { apiVersion: "v1" });
     
-    // Parsear JSON (limpiar markdown si viene)
+    // Configuramos mayor temperatura para que la redacción sea más natural
+    const generationConfig = {
+      temperature: 1,
+      topP: 0.95,
+      topK: 64,
+      maxOutputTokens: 8192,
+    };
+    
+    const prompt = `Eres un experto en análisis de patrones conversacionales para Everwod.
+He agrupado las conversaciones en clusters semánticos. 
+Analiza los siguientes patrones detectados y genera una FAQ (pregunta y respuesta) refinada por cada patrón.
+La respuesta debe ser clara, profesional y servicial.
+
+Responde SOLO con un array JSON (formato: [{ "question": "...", "answer": "..." }]).
+
+PATRONES DETECTADOS:
+${clusterSummary}`;
+
+    const result = await model.generateContent({
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      generationConfig
+    });
+    const aiText = result.response.text();
+    
+    // Limpieza y parseo
     const jsonStr = aiText.replace(/```json\n?/, '').replace(/```\n?/, '');
     const faqs = JSON.parse(jsonStr);
 
-    if (!Array.isArray(faqs)) {
-      throw new Error('La IA no devolvió un array válido');
-    }
-
-    // Insertar en la BD
-    const faqsToInsert = faqs.map(faq => ({
+    // Insertar FAQs
+    const faqsToInsert = faqs.map((faq: { question: string; answer: string }) => ({
       file_id: fileId,
       question: faq.question,
       answer: faq.answer,
       status: 'pending'
     }));
 
-    const { error: insertError } = await supabaseAdmin.from('faqs').insert(faqsToInsert);
-    if (insertError) throw insertError;
-
-    // Actualizar estado del archivo
+    await supabaseAdmin.from('faqs').insert(faqsToInsert);
     await supabaseAdmin.from('files').update({ faq_generated: true }).eq('id', fileId);
 
     return res.status(200).json({ success: true, count: faqsToInsert.length });
+
   } catch (error: unknown) {
-    console.error('Error generating FAQs:', error);
-    return res.status(500).json({ error: 'INTERNAL_ERROR', message: error instanceof Error ? error.message : 'Error al generar FAQs' });
+    console.error('Error in generate-faqs:', error);
+    const message = error instanceof Error ? error.message : 'Error desconocido';
+    return res.status(500).json({ error: 'INTERNAL_ERROR', message });
   }
 }
+

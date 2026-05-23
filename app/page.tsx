@@ -172,6 +172,13 @@ export default function DashboardPage() {
                 >
                   <motion.span whileHover={{ scale: 1.05 }} className="block">Ver archivos</motion.span>
                 </Link>
+                <Link
+                  href="/evaluation"
+                  className="bg-[#111] hover:bg-black text-[#FACC15] border border-[#FACC15]/40 px-7 py-3.5 rounded-2xl font-bold text-sm transition-all duration-300 shadow-[0_4px_14px_0_rgba(250,204,21,0.15)] hover:shadow-[0_6px_20px_rgba(250,204,21,0.23)]"
+                >
+                  <motion.span whileHover={{ scale: 1.05 }} className="block">Evaluación</motion.span>
+                </Link>
+
               </motion.div>
             </div>
 

@@ -15,6 +15,7 @@ const config: Config = {
         secondary: "var(--text-secondary)",
         gold: "var(--color-gold)",
         "gold-glow": "var(--color-gold-glow)",
+        "neon-green": "var(--color-neon-green)",
         card: "var(--card-bg)",
         "card-border": "var(--card-border)",
       },

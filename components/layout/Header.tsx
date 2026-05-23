@@ -13,6 +13,8 @@ export default function Header() {
   const navLinks = [
     { href: '/upload', label: 'Subir' },
     { href: '/files', label: 'Archivos' },
+    { href: '/suggestions', label: 'Sugerencias' },
+    { href: '/dashboard', label: 'Dashboard' },
     { href: '/', label: 'Métricas' },
   ];
 
