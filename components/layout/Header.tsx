@@ -5,10 +5,32 @@ import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import LogoutButton from '../LogoutButton';
 import { useTheme } from '../providers/ThemeProvider';
+import { useDetectorHealth } from '../../hooks/useDetectorHealth';
 
 export default function Header() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { theme, toggleTheme } = useTheme();
+  const { online, health, lastCheckedAt } = useDetectorHealth();
+
+  const statusLabel =
+    online === null ? 'Verificando…' : online ? 'Detector activo' : 'Detector caído';
+  const statusColor =
+    online === null ? '#FACC15' : online ? '#00D9A0' : '#FF4D4D';
+  const statusTitle = (() => {
+    if (!lastCheckedAt) return 'Verificando estado del detector';
+    const lines: string[] = [`Último check: ${lastCheckedAt.toLocaleTimeString()}`];
+    if (health?.version) lines.push(`Versión: ${health.version}`);
+    if (health?.last_successful_run_at) {
+      lines.push(`Última corrida: ${new Date(health.last_successful_run_at).toLocaleString()}`);
+    }
+    if (health?.scheduler_next_run_at) {
+      lines.push(`Próxima corrida: ${new Date(health.scheduler_next_run_at).toLocaleString()}`);
+    }
+    if (health?.hf_inference_reachable !== null && health?.hf_inference_reachable !== undefined) {
+      lines.push(`HF Inference: ${health.hf_inference_reachable ? 'reachable' : 'down'}`);
+    }
+    return lines.join('\n');
+  })();
 
   const navLinks = [
     { href: '/upload', label: 'Subir' },
@@ -50,12 +72,25 @@ export default function Header() {
               </div>
 
               {/* Active system badge */}
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/5 border border-card-border">
+              <div
+                className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/5 border border-card-border"
+                title={statusTitle}
+              >
                 <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#00D9A0] opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-[#00D9A0]"></span>
+                  {online && (
+                    <span
+                      className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75"
+                      style={{ backgroundColor: statusColor }}
+                    ></span>
+                  )}
+                  <span
+                    className="relative inline-flex rounded-full h-2 w-2"
+                    style={{ backgroundColor: statusColor }}
+                  ></span>
                 </span>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-secondary">Sistema activo</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-secondary">
+                  {statusLabel}
+                </span>
               </div>
 
               {/* Theme Toggle Premium Switch */}

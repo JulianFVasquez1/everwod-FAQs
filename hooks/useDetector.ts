@@ -1,11 +1,13 @@
 import { useState, useEffect, useCallback } from 'react'
-import { detectorClient } from '@/lib/detector'
+import { detectorClient, isCursorPagination } from '@/lib/detector'
 import type {
   Suggestion,
   SuggestionDetail,
   GetSuggestionsParams,
   ApprovePayload,
   RejectPayload,
+  BulkReviewPayload,
+  BulkReviewResponse,
   DetectorMetrics,
 } from '@/lib/detector'
 import { getSession } from '@/lib/auth'
@@ -30,7 +32,10 @@ export function useSuggestions(initialParams: GetSuggestionsParams = {}) {
     try {
       const res = await detectorClient.getSuggestions(params)
       setSuggestions(res.data ?? [])
-      setTotal(res.pagination?.total ?? 0)
+      const pag = res.pagination
+      // Solo paginación por offset trae `total`; cursor no lo conoce.
+      if (pag && !isCursorPagination(pag)) setTotal(pag.total)
+      else setTotal(res.data?.length ?? 0)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Error desconocido')
     } finally {
@@ -124,6 +129,31 @@ export function useSuggestionActions(onSuccess?: () => void) {
   }, [onSuccess])
 
   return { approve, reject, processing, error }
+}
+
+// Hook para acciones en lote (bulk approve / reject)
+export function useBulkSuggestionActions(onSuccess?: (res: BulkReviewResponse) => void) {
+  const [processing, setProcessing] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [lastResult, setLastResult] = useState<BulkReviewResponse | null>(null)
+
+  const run = useCallback(async (payload: BulkReviewPayload) => {
+    setProcessing(true)
+    setError(null)
+    try {
+      const res = await detectorClient.bulkReview(payload)
+      setLastResult(res.data)
+      onSuccess?.(res.data)
+      return res.data
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Error al procesar lote')
+      throw e
+    } finally {
+      setProcessing(false)
+    }
+  }, [onSuccess])
+
+  return { run, processing, error, lastResult }
 }
 
 // Hook para métricas del dashboard

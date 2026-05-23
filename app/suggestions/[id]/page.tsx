@@ -113,7 +113,7 @@ export default function SuggestionDetailPage() {
                 <p className="text-sm text-secondary">&quot;{msg.message_text}&quot;</p>
                 <div className="shrink-0 flex items-center gap-2">
                   <span className="text-[10px] text-secondary">similitud</span>
-                  <span className="text-xs font-bold text-gold">{Math.round(msg.similarity_score * 100)}%</span>
+                  <span className="text-xs font-bold text-gold">{msg.similarity_score !== null ? `${Math.round(msg.similarity_score * 100)}%` : '—'}</span>
                 </div>
               </div>
             ))}

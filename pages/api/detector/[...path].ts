@@ -1,6 +1,13 @@
 import type { NextApiRequest, NextApiResponse } from 'next'
 
 const DETECTOR_URL = process.env.DETECTOR_URL
+const DETECTOR_API_KEY = process.env.DETECTOR_API_KEY
+
+// Headers del cliente que reenviamos al upstream (lower-case)
+const FORWARDED_REQUEST_HEADERS = new Set([
+  'idempotency-key',
+  'x-workspace-id',
+])
 
 export const config = {
   api: {
@@ -19,11 +26,9 @@ export default async function handler(
     })
   }
 
-  // Construir path desde el parámetro catch-all
   const pathSegments = (req.query.path as string[]) ?? []
   const apiPath = pathSegments.join('/')
 
-  // Construir query string (sin el parámetro 'path' de Next.js)
   const queryParams = { ...req.query }
   delete queryParams.path
   const qs = new URLSearchParams(
@@ -32,29 +37,62 @@ export default async function handler(
       .map(([k, v]) => [k, String(v)])
   ).toString()
 
-  // Para /health no añadimos prefijo /api/v1
+  // /health y /docs son públicos en el backend (exentos del middleware de auth)
   const isHealth = apiPath === 'health'
   const upstreamPath = isHealth ? '/health' : `/api/v1/${apiPath}`
   const targetUrl = `${DETECTOR_URL}${upstreamPath}${qs ? '?' + qs : ''}`
 
+  // Construir headers: Content-Type siempre, X-API-Key si está configurada,
+  // más los headers permitidos que vengan del cliente (Idempotency-Key, X-Workspace-ID)
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  }
+  if (DETECTOR_API_KEY) headers['X-API-Key'] = DETECTOR_API_KEY
+  for (const [name, value] of Object.entries(req.headers)) {
+    if (!value || typeof value !== 'string') continue
+    if (FORWARDED_REQUEST_HEADERS.has(name.toLowerCase())) {
+      headers[name] = value
+    }
+  }
+
   try {
     const upstream = await fetch(targetUrl, {
       method: req.method,
-      headers: {
-        'Content-Type': 'application/json',
-        // Cuando Juan active auth, agregar aquí:
-        // 'X-API-Key': process.env.DETECTOR_API_KEY ?? '',
-      },
+      headers,
       body:
         req.method !== 'GET' && req.method !== 'HEAD'
           ? JSON.stringify(req.body)
           : undefined,
     })
 
-    const contentType = upstream.headers.get('content-type')
-    const isJson = contentType && contentType.includes('application/json')
+    const contentType = upstream.headers.get('content-type') ?? ''
 
-    if (!isJson) {
+    // SSE: streamear text/event-stream tal cual al cliente
+    if (contentType.includes('text/event-stream')) {
+      res.writeHead(upstream.status, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache, no-transform',
+        Connection: 'keep-alive',
+        'X-Accel-Buffering': 'no',
+      })
+      if (!upstream.body) {
+        res.end()
+        return
+      }
+      const reader = upstream.body.getReader()
+      try {
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          if (value) res.write(Buffer.from(value))
+        }
+      } finally {
+        res.end()
+      }
+      return
+    }
+
+    if (!contentType.includes('application/json')) {
       const text = await upstream.text()
       console.error(
         '[detector-proxy] Upstream returned non-JSON response:',
@@ -70,7 +108,6 @@ export default async function handler(
     }
 
     const data = await upstream.json()
-    console.log('[detector-proxy] Response data:', JSON.stringify(data, null, 2))
     return res.status(upstream.status).json(data)
   } catch (err) {
     console.error('[detector-proxy] Runtime Error:', err)

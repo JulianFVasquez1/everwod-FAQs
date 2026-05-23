@@ -8,9 +8,14 @@ import type {
   ApprovePayload,
   RejectPayload,
   RunPipelinePayload,
+  RunPipelineResponse,
   PipelineRun,
   DetectorMetrics,
   Workspace,
+  WorkspaceDetail,
+  HealthStatus,
+  BulkReviewPayload,
+  BulkReviewResponse,
   DetectorResponse,
 } from './types'
 
@@ -23,21 +28,21 @@ async function request<T>(
   options?: RequestInit
 ): Promise<DetectorResponse<T>> {
   const res = await fetch(`${BASE}${path}`, {
-    headers: { 
+    headers: {
       'Content-Type': 'application/json',
       'Cache-Control': 'no-cache, no-store, must-revalidate',
       'Pragma': 'no-cache',
-      'Expires': '0'
+      'Expires': '0',
+      ...(options?.headers ?? {}),
     },
     ...options,
   })
 
-  // Usamos el texto de la respuesta si no es JSON válido para evitar errores de parseo
-  let json: DetectorResponse<T>;
+  let json: DetectorResponse<T>
   try {
-    json = await res.json();
-  } catch (e) {
-    throw new Error(`Error inesperado: ${res.statusText}`);
+    json = await res.json()
+  } catch {
+    throw new Error(`Error inesperado: ${res.statusText}`)
   }
 
   if (!res.ok) {
@@ -51,9 +56,13 @@ async function request<T>(
 
 export const detectorClient = {
   // ── HEALTH ──────────────────────────────────────────────────────────
-  async health(): Promise<{ ok: boolean; db?: string }> {
+  async health(): Promise<HealthStatus> {
     const res = await fetch(`${BASE}/health`)
-    return res.json()
+    const json: DetectorResponse<HealthStatus> = await res.json()
+    if (!res.ok || !json.ok) {
+      throw new Error(json?.error?.message ?? `Health check failed (${res.status})`)
+    }
+    return json.data
   },
 
   // ── SUGGESTIONS ─────────────────────────────────────────────────────
@@ -83,10 +92,20 @@ export const detectorClient = {
     })
   },
 
-  // ── PIPELINE ────────────────────────────────────────────────────────
-  async runPipeline(payload: RunPipelinePayload = {}) {
-    return request<{ run_id: number; message: string }>(`/pipeline/run`, {
+  async bulkReview(payload: BulkReviewPayload) {
+    return request<BulkReviewResponse>(`/suggestions/bulk`, {
       method: 'POST',
+      body: JSON.stringify(payload),
+    })
+  },
+
+  // ── PIPELINE ────────────────────────────────────────────────────────
+  async runPipeline(payload: RunPipelinePayload = {}, opts: { idempotencyKey?: string } = {}) {
+    const headers: Record<string, string> = {}
+    if (opts.idempotencyKey) headers['Idempotency-Key'] = opts.idempotencyKey
+    return request<RunPipelineResponse>(`/pipeline/run`, {
+      method: 'POST',
+      headers,
       body: JSON.stringify(payload),
     })
   },
@@ -99,6 +118,11 @@ export const detectorClient = {
     return request<PipelineRun>(`/pipeline/runs/${id}`)
   },
 
+  // Server-Sent Events stream — el caller debe escuchar 'message' y cerrar.
+  streamPipelineRun(id: number): EventSource {
+    return new EventSource(`${BASE}/pipeline/runs/${id}/stream`)
+  },
+
   // ── METRICS ─────────────────────────────────────────────────────────
   async getMetrics() {
     return request<DetectorMetrics>('/metrics')
@@ -107,5 +131,9 @@ export const detectorClient = {
   // ── WORKSPACES ──────────────────────────────────────────────────────
   async getWorkspaces() {
     return request<Workspace[]>('/workspaces')
+  },
+
+  async getWorkspaceDetail(workspaceId: number) {
+    return request<WorkspaceDetail>(`/workspaces/${workspaceId}`)
   },
 }

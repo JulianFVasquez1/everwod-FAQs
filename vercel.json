@@ -2,6 +2,9 @@
   "functions": {
     "pages/api/upload.ts": {
       "maxDuration": 60
+    },
+    "pages/api/detector/[...path].ts": {
+      "maxDuration": 60
     }
   },
   "crons": [

@@ -13,9 +13,10 @@ interface Props {
 }
 
 const REASON_LABELS: Record<RejectionReason, string> = {
-  low_quality: 'Baja calidad',
-  duplicate: 'Duplicada',
   irrelevant: 'Irrelevante',
+  already_covered: 'Ya cubierta por una FAQ existente',
+  too_specific: 'Demasiado específica',
+  low_quality: 'Baja calidad',
   other: 'Otro'
 }
 
