@@ -32,7 +32,8 @@ export function useRunPipeline({ defaultSinceDays = 30, onStarted }: Options = {
         (() => {
           const d = new Date()
           d.setDate(d.getDate() - defaultSinceDays)
-          return d.toISOString().slice(0, 10)
+          d.setHours(0, 0, 0, 0)
+          return d.toISOString()
         })()
 
       const idempotencyKey =

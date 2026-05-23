@@ -28,6 +28,7 @@ async function request<T>(
   options?: RequestInit
 ): Promise<DetectorResponse<T>> {
   const res = await fetch(`${BASE}${path}`, {
+    ...options,
     headers: {
       'Content-Type': 'application/json',
       'Cache-Control': 'no-cache, no-store, must-revalidate',
@@ -35,7 +36,6 @@ async function request<T>(
       'Expires': '0',
       ...(options?.headers ?? {}),
     },
-    ...options,
   })
 
   let json: DetectorResponse<T>
@@ -46,9 +46,28 @@ async function request<T>(
   }
 
   if (!res.ok) {
-    throw new Error(
+    const baseMsg =
       json?.error?.message ?? json?.message ?? `Error ${res.status} en ${path}`
-    )
+    const details = json?.error?.details
+    if (Array.isArray(details) && details.length > 0) {
+      const formatted = details
+        .map((d) => {
+          if (typeof d === 'string') return d
+          if (d && typeof d === 'object') {
+            const dd = d as { loc?: unknown[]; msg?: string }
+            const loc = Array.isArray(dd.loc)
+              ? dd.loc.filter((seg) => seg !== 'body').join('.')
+              : ''
+            return loc ? `${loc}: ${dd.msg ?? ''}` : (dd.msg ?? JSON.stringify(d))
+          }
+          return JSON.stringify(d)
+        })
+        .filter(Boolean)
+        .slice(0, 5)
+        .join(' · ')
+      throw new Error(`${baseMsg} (${formatted})`)
+    }
+    throw new Error(baseMsg)
   }
 
   return json
