@@ -45,18 +45,23 @@ export const WorkspaceSelect: React.FC<Props> = ({
           {!loading && !error && workspaces.length === 0 && (
             <option value="" className="bg-[#0a0a0a]">Sin workspaces disponibles</option>
           )}
-          {!loading && !error && workspaces.map((ws) => (
-            <option
-              key={ws.workspace_id}
-              value={ws.workspace_id}
-              className="bg-[#0a0a0a]"
-            >
-              {ws.workspace_name ?? `Workspace ${ws.workspace_id}`}
-              {' · '}
-              {ws.suggestions_total} sugerencias
-              {ws.suggestions_pending > 0 && ` (${ws.suggestions_pending} pendientes)`}
-            </option>
-          ))}
+          {!loading && !error && workspaces.map((ws) => {
+            const name = ws.workspace_name ?? `Workspace ${ws.workspace_id}`
+            const summary = ws.suggestions_total === 0
+              ? 'sin análisis previo'
+              : `${ws.suggestions_total} sugerencias${
+                  ws.suggestions_pending > 0 ? ` (${ws.suggestions_pending} pendientes)` : ''
+                }`
+            return (
+              <option
+                key={ws.workspace_id}
+                value={ws.workspace_id}
+                className="bg-[#0a0a0a]"
+              >
+                {name} · {summary}
+              </option>
+            )
+          })}
         </select>
         <svg
           className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-secondary"
