@@ -1,34 +1,61 @@
-// Tipos derivados del contrato real de la API de Juan Dulcey
-// Ref: api-contracts/postman_collection.json del repo everwod-faq-detector
+// Tipos derivados del contrato real de la API del everwod-faq-detector
+// Ref: api-contracts/openapi.json + backend/models/schemas.py del repo backend
+// Backend: https://dulceychon-everwod-faq-detector.hf.space
 
-export type SuggestionStatus = 'pending' | 'approved' | 'rejected'
+export type SuggestionStatus = 'pending' | 'approved' | 'rejected' | 'edited'
 export type SortOption = 'confidence_desc' | 'message_count_desc' | 'created_at_desc'
-export type SynthesisMethod = 'llm' | 'extractive'
-export type RejectionReason = 'low_quality' | 'duplicate' | 'irrelevant' | 'other'
+export type SynthesisMethod = 'llm' | 'centroid'
+export type PipelineStatus = 'running' | 'success' | 'failed'
+export type TriggerSource = 'scheduler' | 'manual' | 'api'
+export type ReviewAction = 'approved' | 'rejected' | 'edited'
+export type RejectionReason =
+  | 'irrelevant'
+  | 'already_covered'
+  | 'too_specific'
+  | 'low_quality'
+  | 'other'
+
+export interface SuggestionMessage {
+  id: number
+  chat_message_id: string
+  message_text: string
+  similarity_score: number | null
+}
+
+export interface SuggestionReview {
+  id: number
+  action: ReviewAction
+  reviewer: string
+  notes?: string | null
+  edited_question?: string | null
+  edited_answer?: string | null
+  created_at: string
+}
+
+export interface SimilarExistingFaq {
+  faq_id: string
+  question: string
+  similarity: number
+}
 
 export interface Suggestion {
   id: number
   workspace_id: number
-  agent_id?: string
-  cluster_id?: number
+  agent_id?: string | null
+  pipeline_run_id?: number | null
+  cluster_id: number
   suggested_question: string
   suggested_answer: string
   message_count: number
   confidence_score: number
-  status: SuggestionStatus
+  category?: string | null
   synthesis_method: SynthesisMethod
-  category?: string
+  status: SuggestionStatus
   created_at: string
-  reviewed_at?: string
-  reviewed_by?: string
-}
-
-export interface SuggestionMessage {
-  id: number
-  suggestion_id: number
-  chat_message_id: string
-  message_text: string
-  similarity_score: number
+  reviewed_at?: string | null
+  reviewed_by?: string | null
+  sample_messages?: SuggestionMessage[] | null
+  similar_existing_faq?: SimilarExistingFaq | null
 }
 
 export interface SuggestionDetail extends Suggestion {
@@ -36,56 +63,93 @@ export interface SuggestionDetail extends Suggestion {
   reviews: SuggestionReview[]
 }
 
-export interface SuggestionReview {
-  id: number
-  suggestion_id: number
-  action: 'approved' | 'rejected' | 'edited'
-  reviewer: string
-  notes?: string
-  created_at: string
-}
-
 export interface PipelineRun {
   id: number
   started_at: string
-  finished_at?: string
+  finished_at?: string | null
+  status: PipelineStatus
+  triggered_by: TriggerSource
+  workspace_id?: number | null
   messages_processed: number
+  messages_clustered: number
+  messages_noise: number
   clusters_found: number
   suggestions_generated: number
-  status: 'running' | 'completed' | 'failed' | 'SUCCESS'
-  parameters?: Record<string, unknown>
+  suggestions_skipped: number
+  silhouette_score?: number | null
+  duration_seconds?: number | null
+  parameters?: Record<string, unknown> | null
+  error?: string | null
+}
+
+// ── Métricas (alineado con GlobalMetricsOut del backend) ────────────────
+export interface MetricsOverview {
+  total_suggestions: number
+  pending: number
+  approved: number
+  rejected: number
+  edited: number
+  approval_rate: number
+  avg_confidence_score: number
+}
+
+export interface MetricsPipeline {
+  last_run_at: string | null
+  last_run_duration_seconds: number | null
+  last_run_messages_processed: number
+  last_run_clusters_found: number
+  total_runs: number
+  avg_silhouette_score: number | null
+}
+
+export interface MetricsByWorkspace {
+  workspace_id: number
+  workspace_name: string | null
+  total_suggestions: number
+  pending: number
+  approved: number
+  rejected: number
+  top_categories: string[]
+}
+
+export interface MetricsByCategory {
+  category: string
+  count: number
+  approval_rate: number
+}
+
+export interface MetricsTrends {
+  suggestions_last_7_days: number
+  suggestions_last_30_days: number
+  avg_message_count_per_cluster: number
 }
 
 export interface DetectorMetrics {
-  overview: {
-    total_suggestions: number
-    pending: number
-    approved: number
-    rejected: number
-    approval_rate: number
-    avg_confidence_score: number
-  }
-  pipeline: {
-    last_run_at: string
-    last_run_messages_processed: number
-    last_run_clusters_found: number
-    total_runs: number
-  }
-  suggestions_by_workspace?: Array<{ 
-    workspace_id: number; 
-    workspace_name: string;
-    total_suggestions: number 
-  }>
+  overview: MetricsOverview
+  pipeline: MetricsPipeline
+  by_workspace: MetricsByWorkspace[]
+  by_category: MetricsByCategory[]
+  trends: MetricsTrends
 }
 
+// ── Workspaces ─────────────────────────────────────────────────────────
 export interface Workspace {
-  id: number
-  name: string
-  suggestion_count: number
-  pending_count: number
+  workspace_id: number
+  workspace_name: string | null
+  suggestions_total: number
+  suggestions_pending: number
+  last_suggestion_at: string | null
 }
 
-// Parámetros de listado
+// ── Health ─────────────────────────────────────────────────────────────
+export interface HealthStatus {
+  status: 'ok'
+  db: 'ok' | 'down'
+  environment: string
+  version: string
+}
+
+// ── Parámetros de listado ──────────────────────────────────────────────
 export interface GetSuggestionsParams {
   page?: number
   limit?: number
@@ -93,13 +157,14 @@ export interface GetSuggestionsParams {
   status?: SuggestionStatus
   workspace_id?: number
   category?: string
+  agent_id?: string
   synthesis_method?: SynthesisMethod
   min_message_count?: number
   date_from?: string
   date_to?: string
 }
 
-// Cuerpos de request
+// ── Cuerpos de request ─────────────────────────────────────────────────
 export interface ApprovePayload {
   reviewer: string
   notes?: string
@@ -118,9 +183,17 @@ export interface RunPipelinePayload {
   since?: string
   limit?: number
   synthesis?: SynthesisMethod
+  dry_run?: boolean
 }
 
-// Respuesta estándar de la API
+export interface RunPipelineResponse {
+  run_id: number | null
+  status: 'queued' | 'queued_dry_run'
+  started_at: string
+  poll_url: string | null
+}
+
+// ── Respuesta estándar de la API (envelope) ────────────────────────────
 export interface DetectorResponse<T> {
   ok: boolean
   data: T
@@ -128,6 +201,7 @@ export interface DetectorResponse<T> {
   error?: {
     code: string
     message: string
+    details?: unknown[]
   }
   pagination?: {
     page: number

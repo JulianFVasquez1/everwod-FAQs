@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { useDetectorMetrics } from '@/hooks/useDetector'
 import { detectorClient, type PipelineRun } from '@/lib/detector'
+import { WorkspaceSelect } from '@/components/detector/WorkspaceSelect'
 
 const StatCard = ({ label, value, loading, sublabel, color = 'var(--color-gold)' }: any) => (
   <div className="glass p-8 border-card-border flex flex-col items-center text-center">
@@ -29,6 +30,7 @@ export default function DetectorDashboard() {
   const [runs, setRuns] = useState<PipelineRun[]>([])
   const [runsLoading, setRunsLoading] = useState(true)
   const [pollingId, setPollingId] = useState<number | null>(null)
+  const [workspaceId, setWorkspaceId] = useState<number | null>(null)
 
   useEffect(() => {
     detectorClient.getPipelineRuns()
@@ -66,12 +68,16 @@ export default function DetectorDashboard() {
   }, [pollingId, refetch])
 
   const handleRunPipeline = async () => {
+    if (!workspaceId) {
+      alert('Selecciona un workspace antes de ejecutar el análisis.')
+      return
+    }
     try {
-      const res = await detectorClient.runPipeline({ 
+      const res = await detectorClient.runPipeline({
         since: '2025-01-01',
-        workspace_id: 153
+        workspace_id: workspaceId,
       })
-      setPollingId(res.data.run_id)
+      if (res.data.run_id !== null) setPollingId(res.data.run_id)
       alert('Pipeline iniciado. Monitoreando progreso...')
     } catch (e) {
       alert('Error: ' + (e instanceof Error ? e.message : 'Desconocido'))
@@ -89,9 +95,15 @@ export default function DetectorDashboard() {
             <p className="text-secondary">Monitoreo global del sistema de detección</p>
           </div>
 
+          <div className="flex items-center gap-4 flex-wrap">
+            <WorkspaceSelect
+              value={workspaceId}
+              onChange={setWorkspaceId}
+              label="Workspace"
+            />
           <button
             onClick={handleRunPipeline}
-            disabled={pollingId !== null}
+            disabled={pollingId !== null || !workspaceId}
             className="premium-gradient px-8 py-3 rounded-2xl font-bold text-black flex items-center gap-2 transition-all hover:scale-105 disabled:opacity-50"
           >
             {pollingId !== null ? (
@@ -103,6 +115,7 @@ export default function DetectorDashboard() {
               'Ejecutar nuevo análisis'
             )}
           </button>
+          </div>
         </div>
 
         {error && (
@@ -166,8 +179,8 @@ export default function DetectorDashboard() {
                         <td className="px-6 py-4 font-mono text-sm">#{run.id}</td>
                         <td className="px-6 py-4">
                           <span className={`text-[10px] font-black uppercase px-2 py-1 rounded ${
-                            (run.status?.toLowerCase() === 'completed' || run.status?.toLowerCase() === 'success') ? 'bg-green-500/20 text-green-400' :
-                            run.status?.toLowerCase() === 'failed' ? 'bg-red-500/20 text-red-400' :
+                            run.status === 'success' ? 'bg-green-500/20 text-green-400' :
+                            run.status === 'failed' ? 'bg-red-500/20 text-red-400' :
                             'bg-gold/20 text-gold animate-pulse'
                           }`}>
                             {run.status}
@@ -203,11 +216,86 @@ export default function DetectorDashboard() {
                   {metrics?.pipeline?.last_run_messages_processed?.toLocaleString() || 0}
                 </p>
               </div>
+              <div>
+                <p className="text-xs font-bold text-secondary uppercase mb-1">Confianza promedio</p>
+                <p className="text-xl font-bold text-primary">
+                  {metrics?.overview?.avg_confidence_score
+                    ? `${Math.round(metrics.overview.avg_confidence_score * 100)}%`
+                    : '—'}
+                </p>
+              </div>
+              {metrics?.pipeline?.avg_silhouette_score !== null &&
+                metrics?.pipeline?.avg_silhouette_score !== undefined && (
+                  <div>
+                    <p className="text-xs font-bold text-secondary uppercase mb-1">
+                      Silhouette score (clustering)
+                    </p>
+                    <p className="text-xl font-bold text-primary">
+                      {metrics.pipeline.avg_silhouette_score.toFixed(3)}
+                    </p>
+                  </div>
+                )}
               <div className="pt-4 border-t border-white/5">
                 <p className="text-xs text-secondary italic">
                   * El detector procesa mensajes de WhatsApp, Slack y Email para agrupar patrones de preguntas recurrentes.
                 </p>
               </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Tendencias + Categorías */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 mt-12">
+          <div>
+            <h3 className="text-xl font-bold mb-6">Tendencias</h3>
+            <div className="glass p-6 border-card-border grid grid-cols-3 gap-4">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-secondary mb-2">
+                  Últimos 7 días
+                </p>
+                <p className="text-3xl font-black text-gold">
+                  {metrics?.trends?.suggestions_last_7_days ?? 0}
+                </p>
+              </div>
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-secondary mb-2">
+                  Últimos 30 días
+                </p>
+                <p className="text-3xl font-black text-gold">
+                  {metrics?.trends?.suggestions_last_30_days ?? 0}
+                </p>
+              </div>
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-secondary mb-2">
+                  Promedio msgs/cluster
+                </p>
+                <p className="text-3xl font-black text-primary">
+                  {metrics?.trends?.avg_message_count_per_cluster?.toFixed(1) ?? '0.0'}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <h3 className="text-xl font-bold mb-6">Top categorías</h3>
+            <div className="glass p-6 border-card-border space-y-3">
+              {!metrics?.by_category?.length ? (
+                <p className="text-sm text-secondary opacity-50">
+                  Sin datos por categoría todavía.
+                </p>
+              ) : (
+                metrics.by_category.slice(0, 6).map((cat) => (
+                  <div key={cat.category} className="flex items-center justify-between">
+                    <span className="text-sm font-semibold text-primary">{cat.category}</span>
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs text-secondary">
+                        {Math.round(cat.approval_rate * 100)}% aprob.
+                      </span>
+                      <span className="text-sm font-bold text-gold">{cat.count}</span>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>

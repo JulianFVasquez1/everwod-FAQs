@@ -8,9 +8,11 @@ import type {
   ApprovePayload,
   RejectPayload,
   RunPipelinePayload,
+  RunPipelineResponse,
   PipelineRun,
   DetectorMetrics,
   Workspace,
+  HealthStatus,
   DetectorResponse,
 } from './types'
 
@@ -51,9 +53,13 @@ async function request<T>(
 
 export const detectorClient = {
   // ── HEALTH ──────────────────────────────────────────────────────────
-  async health(): Promise<{ ok: boolean; db?: string }> {
+  async health(): Promise<HealthStatus> {
     const res = await fetch(`${BASE}/health`)
-    return res.json()
+    const json: DetectorResponse<HealthStatus> = await res.json()
+    if (!res.ok || !json.ok) {
+      throw new Error(json?.error?.message ?? `Health check failed (${res.status})`)
+    }
+    return json.data
   },
 
   // ── SUGGESTIONS ─────────────────────────────────────────────────────
@@ -85,7 +91,7 @@ export const detectorClient = {
 
   // ── PIPELINE ────────────────────────────────────────────────────────
   async runPipeline(payload: RunPipelinePayload = {}) {
-    return request<{ run_id: number; message: string }>(`/pipeline/run`, {
+    return request<RunPipelineResponse>(`/pipeline/run`, {
       method: 'POST',
       body: JSON.stringify(payload),
     })

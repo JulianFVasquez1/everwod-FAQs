@@ -8,6 +8,7 @@ import { SuggestionCard } from '@/components/detector/SuggestionCard'
 import { SkeletonCard } from '@/components/detector/SkeletonCard'
 import { ApproveModal } from '@/components/detector/ApproveModal'
 import { RejectModal } from '@/components/detector/RejectModal'
+import { WorkspaceSelect } from '@/components/detector/WorkspaceSelect'
 import { getUser } from '@/lib/auth'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -26,9 +27,11 @@ export default function SuggestionsPage() {
   const [modalType, setModalType] = useState<'approve' | 'reject' | null>(null)
   const [userEmail, setUserEmail] = useState<string | null>(null)
   const [analysisLoading, setAnalysisLoading] = useState(false)
+  const [workspaceId, setWorkspaceId] = useState<number | null>(null)
 
   const { suggestions, loading, error, total, params, setParams, refetch } = useSuggestions({
     status: activeStatus === 'all' ? undefined : activeStatus,
+    workspace_id: workspaceId ?? undefined,
   })
 
   const { approve, reject, processing: actionProcessing } = useSuggestionActions(() => {
@@ -46,12 +49,21 @@ export default function SuggestionsPage() {
     setParams(p => ({ ...p, status: status === 'all' ? undefined : status, page: 1 }))
   }
 
+  const handleWorkspaceChange = (id: number | null) => {
+    setWorkspaceId(id)
+    setParams(p => ({ ...p, workspace_id: id ?? undefined, page: 1 }))
+  }
+
   const handleRunAnalysis = async () => {
+    if (!workspaceId) {
+      alert('Selecciona un workspace antes de ejecutar el análisis.')
+      return
+    }
     setAnalysisLoading(true)
     try {
-      await detectorClient.runPipeline({ 
+      await detectorClient.runPipeline({
         since: '2025-01-01',
-        workspace_id: 153
+        workspace_id: workspaceId,
       })
       alert('Análisis iniciado correctamente. Los resultados aparecerán en unos minutos.')
     } catch (e) {
@@ -77,9 +89,16 @@ export default function SuggestionsPage() {
           <p className="text-secondary">Revisiones automáticas encontradas por el detector</p>
         </div>
         
+        <div className="flex items-center gap-4 flex-wrap">
+        <WorkspaceSelect
+          value={workspaceId}
+          onChange={handleWorkspaceChange}
+          label="Workspace"
+          allowAll
+        />
         <button
           onClick={handleRunAnalysis}
-          disabled={analysisLoading}
+          disabled={analysisLoading || !workspaceId}
           className="premium-gradient px-8 py-3 rounded-2xl font-bold text-black flex items-center gap-2 transition-all hover:scale-105 disabled:opacity-50"
         >
           {analysisLoading ? (
@@ -91,6 +110,7 @@ export default function SuggestionsPage() {
           )}
           Ejecutar análisis
         </button>
+        </div>
       </div>
 
       {/* Filtros */}
