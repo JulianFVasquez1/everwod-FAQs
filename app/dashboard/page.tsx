@@ -8,6 +8,7 @@ import { useRunPipeline } from '@/hooks/useRunPipeline'
 import { useWorkspaces } from '@/hooks/useWorkspaces'
 import { detectorClient, type PipelineRun } from '@/lib/detector'
 import { WorkspaceSelect } from '@/components/detector/WorkspaceSelect'
+import { TimeWindowSelect, type TimeWindow } from '@/components/detector/TimeWindowSelect'
 import { WorkspaceDetailCard } from '@/components/detector/WorkspaceDetailCard'
 import { EmptyDashboard } from '@/components/detector/EmptyDashboard'
 import { StatusDonut } from '@/components/detector/charts/StatusDonut'
@@ -40,6 +41,7 @@ export default function DetectorDashboard() {
   const [runsLoading, setRunsLoading] = useState(true)
   const [pollingId, setPollingId] = useState<number | null>(null)
   const [workspaceId, setWorkspaceId] = useState<number | null>(null)
+  const [timeWindow, setTimeWindow] = useState<TimeWindow>(180)
   const [showRunsTable, setShowRunsTable] = useState(false)
 
   useEffect(() => {
@@ -94,13 +96,12 @@ export default function DetectorDashboard() {
   }, [pollingId, refetch])
 
   const { start: runPipeline, running: launching, error: launchError, clearError } = useRunPipeline({
-    defaultSinceDays: 30,
     onStarted: (runId) => {
       if (runId !== null) setPollingId(runId)
     },
   })
 
-  const handleRunPipeline = () => runPipeline({ workspaceId })
+  const handleRunPipeline = () => runPipeline({ workspaceId, sinceDays: timeWindow })
 
   const overview = metrics?.overview
   const pipeline = metrics?.pipeline
@@ -128,6 +129,7 @@ export default function DetectorDashboard() {
 
           <div className="flex items-center gap-4 flex-wrap">
             <WorkspaceSelect value={workspaceId} onChange={setWorkspaceId} label="Workspace" />
+            <TimeWindowSelect value={timeWindow} onChange={setTimeWindow} label="Ventana" />
             <button
               onClick={handleRunPipeline}
               disabled={pollingId !== null || launching || !workspaceId}

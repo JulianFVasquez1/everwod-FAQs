@@ -10,6 +10,7 @@ import { SkeletonCard } from '@/components/detector/SkeletonCard'
 import { ApproveModal } from '@/components/detector/ApproveModal'
 import { RejectModal } from '@/components/detector/RejectModal'
 import { WorkspaceSelect } from '@/components/detector/WorkspaceSelect'
+import { TimeWindowSelect, type TimeWindow } from '@/components/detector/TimeWindowSelect'
 import { getUser, getSession } from '@/lib/auth'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -28,6 +29,7 @@ export default function SuggestionsPage() {
   const [modalType, setModalType] = useState<'approve' | 'reject' | null>(null)
   const [userEmail, setUserEmail] = useState<string | null>(null)
   const [workspaceId, setWorkspaceId] = useState<number | null>(null)
+  const [timeWindow, setTimeWindow] = useState<TimeWindow>(180)
   const [selectMode, setSelectMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
 
@@ -36,7 +38,7 @@ export default function SuggestionsPage() {
     running: analysisLoading,
     error: launchError,
     clearError: clearLaunchError,
-  } = useRunPipeline({ defaultSinceDays: 30 })
+  } = useRunPipeline()
 
   const { suggestions, loading, error, total, params, setParams, refetch } = useSuggestions({
     status: activeStatus === 'all' ? undefined : activeStatus,
@@ -144,7 +146,7 @@ export default function SuggestionsPage() {
     setParams(p => ({ ...p, workspace_id: id ?? undefined, page: 1 }))
   }
 
-  const handleRunAnalysis = () => runPipeline({ workspaceId })
+  const handleRunAnalysis = () => runPipeline({ workspaceId, sinceDays: timeWindow })
 
   const openModal = (suggestion: Suggestion, type: 'approve' | 'reject') => {
     setSelectedSuggestion(suggestion)
@@ -169,6 +171,7 @@ export default function SuggestionsPage() {
           label="Workspace"
           allowAll
         />
+        <TimeWindowSelect value={timeWindow} onChange={setTimeWindow} label="Ventana" />
         <button
           onClick={handleRunAnalysis}
           disabled={analysisLoading || !workspaceId}
