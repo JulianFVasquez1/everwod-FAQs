@@ -5,9 +5,11 @@ import Link from 'next/link'
 import { motion } from 'framer-motion'
 import { useDetectorMetrics } from '@/hooks/useDetector'
 import { useRunPipeline } from '@/hooks/useRunPipeline'
+import { useWorkspaces } from '@/hooks/useWorkspaces'
 import { detectorClient, type PipelineRun } from '@/lib/detector'
 import { WorkspaceSelect } from '@/components/detector/WorkspaceSelect'
 import { WorkspaceDetailCard } from '@/components/detector/WorkspaceDetailCard'
+import { EmptyDashboard } from '@/components/detector/EmptyDashboard'
 import { StatusDonut } from '@/components/detector/charts/StatusDonut'
 import { CategoryBars } from '@/components/detector/charts/CategoryBars'
 import { WorkspaceBars } from '@/components/detector/charts/WorkspaceBars'
@@ -33,6 +35,7 @@ const MiniStat = ({
 
 export default function DetectorDashboard() {
   const { metrics, loading, error, refetch } = useDetectorMetrics()
+  const { workspaces, loading: workspacesLoading } = useWorkspaces()
   const [runs, setRuns] = useState<PipelineRun[]>([])
   const [runsLoading, setRunsLoading] = useState(true)
   const [pollingId, setPollingId] = useState<number | null>(null)
@@ -90,29 +93,26 @@ export default function DetectorDashboard() {
     }
   }, [pollingId, refetch])
 
-  const handleRunPipeline = async () => {
-    if (!workspaceId) {
-      alert('Selecciona un workspace antes de ejecutar el análisis.')
-      return
-    }
-    try {
-      const idempotencyKey = (typeof crypto !== 'undefined' && 'randomUUID' in crypto)
-        ? crypto.randomUUID()
-        : `${Date.now()}-${Math.random().toString(36).slice(2)}`
-      const res = await detectorClient.runPipeline(
-        { since: '2025-01-01', workspace_id: workspaceId },
-        { idempotencyKey }
-      )
-      if (res.data.run_id !== null) setPollingId(res.data.run_id)
-    } catch (e) {
-      alert('Error: ' + (e instanceof Error ? e.message : 'Desconocido'))
-    }
-  }
+  const { start: runPipeline, running: launching, error: launchError, clearError } = useRunPipeline({
+    defaultSinceDays: 30,
+    onStarted: (runId) => {
+      if (runId !== null) setPollingId(runId)
+    },
+  })
+
+  const handleRunPipeline = () => runPipeline({ workspaceId })
 
   const overview = metrics?.overview
   const pipeline = metrics?.pipeline
   const trends = metrics?.trends
   const totalPending = overview?.pending ?? 0
+
+  // El dashboard está vacío cuando: no estamos cargando, no hay error,
+  // y ni el detector ni el histórico tienen datos para mostrar.
+  const stillLoading = loading || runsLoading || workspacesLoading
+  const totalSuggestions = overview?.total_suggestions ?? 0
+  const isEmpty =
+    !stillLoading && !error && totalSuggestions === 0 && runs.length === 0
 
   return (
     <main className="min-h-screen bg-background px-6 py-10">
@@ -130,13 +130,13 @@ export default function DetectorDashboard() {
             <WorkspaceSelect value={workspaceId} onChange={setWorkspaceId} label="Workspace" />
             <button
               onClick={handleRunPipeline}
-              disabled={pollingId !== null || !workspaceId}
+              disabled={pollingId !== null || launching || !workspaceId}
               className="premium-gradient px-8 py-3 rounded-2xl font-bold text-black flex items-center gap-2 transition-all hover:scale-105 disabled:opacity-50"
             >
-              {pollingId !== null ? (
+              {pollingId !== null || launching ? (
                 <>
                   <div className="w-5 h-5 border-2 border-black/30 border-t-black animate-spin rounded-full" />
-                  Analizando...
+                  {launching ? 'Encolando…' : 'Analizando…'}
                 </>
               ) : (
                 'Ejecutar nuevo análisis'
@@ -151,8 +151,30 @@ export default function DetectorDashboard() {
           </div>
         )}
 
+        {launchError && (
+          <div className="mb-8 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl flex items-center justify-between gap-4">
+            <p className="text-red-400 text-sm">{launchError}</p>
+            <button
+              onClick={clearError}
+              className="text-xs font-bold text-red-400 hover:text-red-300 underline"
+            >
+              Descartar
+            </button>
+          </div>
+        )}
+
+        {/* Empty state global: aparece cuando no hay ningún dato del detector */}
+        {isEmpty && (
+          <EmptyDashboard
+            hasWorkspaces={workspaces.length > 0}
+            workspaceSelected={workspaceId !== null}
+            launching={launching}
+            onRunPipeline={handleRunPipeline}
+          />
+        )}
+
         {/* CTA pendientes */}
-        {totalPending > 0 && (
+        {!isEmpty && totalPending > 0 && (
           <Link
             href="/suggestions"
             className="block mb-8 glass p-5 border-card-border hover:border-gold/40 transition-colors group"
@@ -178,6 +200,8 @@ export default function DetectorDashboard() {
           </Link>
         )}
 
+        {!isEmpty && (
+          <>
         {/* Fila 1: Status donut + KPIs laterales */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
           <div className="lg:col-span-2 glass p-6 border-card-border">
@@ -408,6 +432,8 @@ export default function DetectorDashboard() {
             </motion.div>
           )}
         </div>
+          </>
+        )}
       </div>
     </main>
   )

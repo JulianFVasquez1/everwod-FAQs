@@ -3,7 +3,8 @@
 import { useState, useEffect, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useSuggestions, useSuggestionActions, useBulkSuggestionActions } from '@/hooks/useDetector'
-import { detectorClient, type Suggestion, type SuggestionStatus } from '@/lib/detector'
+import { useRunPipeline } from '@/hooks/useRunPipeline'
+import { type Suggestion, type SuggestionStatus } from '@/lib/detector'
 import { SuggestionCard } from '@/components/detector/SuggestionCard'
 import { SkeletonCard } from '@/components/detector/SkeletonCard'
 import { ApproveModal } from '@/components/detector/ApproveModal'
@@ -26,10 +27,16 @@ export default function SuggestionsPage() {
   const [selectedSuggestion, setSelectedSuggestion] = useState<Suggestion | null>(null)
   const [modalType, setModalType] = useState<'approve' | 'reject' | null>(null)
   const [userEmail, setUserEmail] = useState<string | null>(null)
-  const [analysisLoading, setAnalysisLoading] = useState(false)
   const [workspaceId, setWorkspaceId] = useState<number | null>(null)
   const [selectMode, setSelectMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
+
+  const {
+    start: runPipeline,
+    running: analysisLoading,
+    error: launchError,
+    clearError: clearLaunchError,
+  } = useRunPipeline({ defaultSinceDays: 30 })
 
   const { suggestions, loading, error, total, params, setParams, refetch } = useSuggestions({
     status: activeStatus === 'all' ? undefined : activeStatus,
@@ -137,27 +144,7 @@ export default function SuggestionsPage() {
     setParams(p => ({ ...p, workspace_id: id ?? undefined, page: 1 }))
   }
 
-  const handleRunAnalysis = async () => {
-    if (!workspaceId) {
-      alert('Selecciona un workspace antes de ejecutar el análisis.')
-      return
-    }
-    setAnalysisLoading(true)
-    try {
-      const idempotencyKey = (typeof crypto !== 'undefined' && 'randomUUID' in crypto)
-        ? crypto.randomUUID()
-        : `${Date.now()}-${Math.random().toString(36).slice(2)}`
-      await detectorClient.runPipeline(
-        { since: '2025-01-01', workspace_id: workspaceId },
-        { idempotencyKey }
-      )
-      alert('Análisis iniciado correctamente. Los resultados aparecerán en unos minutos.')
-    } catch (e) {
-      alert('Error al iniciar análisis: ' + (e instanceof Error ? e.message : 'Desconocido'))
-    } finally {
-      setAnalysisLoading(false)
-    }
-  }
+  const handleRunAnalysis = () => runPipeline({ workspaceId })
 
   const openModal = (suggestion: Suggestion, type: 'approve' | 'reject') => {
     setSelectedSuggestion(suggestion)
@@ -234,6 +221,19 @@ export default function SuggestionsPage() {
           {total} sugerencias encontradas
         </div>
       </div>
+
+      {/* Banner de error al lanzar pipeline */}
+      {launchError && (
+        <div className="max-w-7xl mx-auto mb-4 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl flex items-center justify-between gap-4">
+          <p className="text-red-400 text-sm">{launchError}</p>
+          <button
+            onClick={clearLaunchError}
+            className="text-xs font-bold text-red-400 hover:text-red-300 underline"
+          >
+            Descartar
+          </button>
+        </div>
+      )}
 
       {/* Error Banner */}
       {error && (
