@@ -15,6 +15,8 @@ import { StatusDonut } from '@/components/detector/charts/StatusDonut'
 import { CategoryBars } from '@/components/detector/charts/CategoryBars'
 import { WorkspaceBars } from '@/components/detector/charts/WorkspaceBars'
 import { PipelineTimeline } from '@/components/detector/charts/PipelineTimeline'
+import { ClusterVisualizationPanel } from '@/components/detector/charts/ClusterVisualization'
+import { useClusterVisualization } from '@/hooks/useClusterVisualization'
 
 const MiniStat = ({
   label,
@@ -43,6 +45,8 @@ export default function DetectorDashboard() {
   const [workspaceId, setWorkspaceId] = useState<number | null>(null)
   const [timeWindow, setTimeWindow] = useState<TimeWindow>(180)
   const [showRunsTable, setShowRunsTable] = useState(false)
+  const [vizRunId, setVizRunId] = useState<number | null>(null)
+  const viz = useClusterVisualization(vizRunId)
 
   useEffect(() => {
     detectorClient.getPipelineRuns(1, 100)
@@ -200,6 +204,70 @@ export default function DetectorDashboard() {
               </span>
             </div>
           </Link>
+        )}
+
+        {/* Modal de visualización de clusters */}
+        {vizRunId !== null && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+            onClick={() => setVizRunId(null)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="bg-background border border-card-border rounded-2xl max-w-6xl w-full max-h-[92vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="sticky top-0 z-10 flex items-center justify-between px-6 py-4 border-b border-card-border bg-background/95 backdrop-blur">
+                <div>
+                  <h2 className="text-xl font-extrabold text-primary">
+                    Mapa de clusters · Run #{vizRunId}
+                  </h2>
+                  <p className="text-xs text-secondary mt-0.5">
+                    Visualización del clustering semántico generado por el pipeline.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setVizRunId(null)}
+                  className="text-secondary hover:text-primary text-2xl leading-none px-2"
+                  aria-label="Cerrar"
+                >
+                  ×
+                </button>
+              </div>
+              <div className="p-6">
+                {viz.loading && (
+                  <div className="flex flex-col items-center justify-center py-20 gap-3">
+                    <div className="w-10 h-10 border-2 border-gold/30 border-t-gold rounded-full animate-spin" />
+                    <p className="text-sm text-secondary">Cargando visualización…</p>
+                  </div>
+                )}
+                {viz.notFound && (
+                  <div className="py-16 text-center">
+                    <p className="text-secondary mb-2">
+                      Esta corrida no tiene snapshot de visualización.
+                    </p>
+                    <p className="text-xs text-secondary opacity-60">
+                      Las corridas previas a la migración 003 no incluyen el mapa de clusters.
+                      Vuelve a ejecutar el pipeline para generar uno nuevo.
+                    </p>
+                  </div>
+                )}
+                {viz.error && (
+                  <div className="py-16 text-center">
+                    <p className="text-red-400 mb-2">{viz.error}</p>
+                    <button
+                      onClick={viz.refetch}
+                      className="text-xs font-bold px-3 py-1.5 rounded bg-gold/10 text-gold hover:bg-gold/20 transition-colors"
+                    >
+                      Reintentar
+                    </button>
+                  </div>
+                )}
+                {viz.data && <ClusterVisualizationPanel data={viz.data} />}
+              </div>
+            </motion.div>
+          </div>
         )}
 
         {!isEmpty && (
@@ -394,12 +462,13 @@ export default function DetectorDashboard() {
                     <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-secondary">Clusters</th>
                     <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-secondary">Sugs</th>
                     <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-secondary">Duración</th>
+                    <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-secondary text-right">Acciones</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
                   {runs.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="px-4 py-10 text-center text-secondary opacity-50">
+                      <td colSpan={9} className="px-4 py-10 text-center text-secondary opacity-50">
                         No hay corridas previas
                       </td>
                     </tr>
@@ -425,6 +494,22 @@ export default function DetectorDashboard() {
                         <td className="px-4 py-3 font-bold text-gold">{run.suggestions_generated}</td>
                         <td className="px-4 py-3 text-secondary">
                           {run.duration_seconds ? `${run.duration_seconds.toFixed(1)}s` : '—'}
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <button
+                            onClick={() => setVizRunId(run.id)}
+                            disabled={run.status !== 'success' || run.clusters_found === 0}
+                            className="text-[10px] font-bold px-2 py-1 rounded bg-gold/10 text-gold hover:bg-gold/20 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                            title={
+                              run.status !== 'success'
+                                ? 'Solo runs exitosos tienen visualización'
+                                : run.clusters_found === 0
+                                ? 'Este run no encontró clusters'
+                                : 'Ver mapa de clusters'
+                            }
+                          >
+                            Ver clusters →
+                          </button>
                         </td>
                       </tr>
                     ))

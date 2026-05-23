@@ -10,6 +10,7 @@ import type {
   RunPipelinePayload,
   RunPipelineResponse,
   PipelineRun,
+  ClusterVisualization,
   DetectorMetrics,
   Workspace,
   WorkspaceDetail,
@@ -135,6 +136,11 @@ export const detectorClient = {
 
   async getPipelineRun(id: number) {
     return request<PipelineRun>(`/pipeline/runs/${id}`)
+  },
+
+  /** 404 si la corrida es antigua o el snapshot falló al construirse. */
+  async getPipelineRunVisualization(id: number) {
+    return request<ClusterVisualization>(`/pipeline/runs/${id}/visualization`)
   },
 
   // Server-Sent Events stream — el caller debe escuchar 'message' y cerrar.

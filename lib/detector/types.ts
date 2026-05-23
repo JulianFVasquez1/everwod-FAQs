@@ -63,6 +63,60 @@ export interface SuggestionDetail extends Suggestion {
   reviews: SuggestionReview[]
 }
 
+// ── Cluster visualization (snapshot persistido por el pipeline) ─────────
+export interface ClusterVizPoint {
+  x: number
+  y: number
+  /** -1 = ruido (no asignado a ningún cluster). */
+  cluster_id: number
+  preview: string
+}
+
+export interface ClusterVizTopMessage {
+  message_id: string
+  text: string
+  similarity: number
+}
+
+export interface ClusterVizNearestFaq {
+  faq_id: string
+  similarity: number
+}
+
+export interface ClusterVizCluster {
+  cluster_id: number
+  size: number
+  cohesion: number
+  confidence_score: number
+  /** true = no está cubierto por FAQ existente (candidato a sugerencia). */
+  is_new: boolean
+  nearest_faq: ClusterVizNearestFaq | null
+  top_messages: ClusterVizTopMessage[]
+}
+
+export interface ClusterVizSizeDistribution {
+  min: number
+  median: number
+  mean: number
+  p90: number
+  max: number
+}
+
+export interface ClusterVisualization {
+  algorithm: string
+  n_clusters: number
+  messages_total: number
+  messages_clustered: number
+  messages_noise: number
+  noise_ratio: number
+  size_distribution: ClusterVizSizeDistribution
+  points: ClusterVizPoint[]
+  clusters: ClusterVizCluster[]
+  /** true = `points` es una muestra estratificada (no incluye todos los mensajes). */
+  sampled: boolean
+  sample_size: number
+}
+
 export interface PipelineRun {
   id: number
   started_at: string
