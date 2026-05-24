@@ -324,7 +324,7 @@ export default function DetectorDashboard() {
           <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-8">
             <MiniStat
               label="Calidad ★"
-              value={`${Math.round(quality.avg_overall * 100)}%`}
+              value={`${Math.round(quality.avg_quality_score * 100)}%`}
               sublabel={`media · ${quality.evaluated_count} eval.`}
               color="var(--color-gold)"
             />
@@ -351,6 +351,244 @@ export default function DetectorDashboard() {
             />
           </div>
         )}
+
+        {/* Sección: Calidad por método de síntesis */}
+        {quality && (
+          <div className="mb-8">
+            <h3 className="text-sm font-bold text-secondary uppercase tracking-widest mb-4">
+              Calidad por método de síntesis
+            </h3>
+            {loading ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="glass p-6 border-card-border h-28 animate-pulse bg-white/5 rounded" />
+                <div className="glass p-6 border-card-border h-28 animate-pulse bg-white/5 rounded" />
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* LLM card */}
+                <div className="glass p-6 border-card-border">
+                  <p className="text-[10px] font-bold text-secondary uppercase tracking-widest mb-2">
+                    LLM (Qwen2.5-72B)
+                  </p>
+                  {quality.quality_by_method?.llm != null ? (
+                    <>
+                      <p className="text-3xl font-black text-gold mb-1">
+                        {(quality.quality_by_method.llm * 100).toFixed(2)}%
+                      </p>
+                      <p className="text-[10px] text-secondary opacity-60">avg quality score</p>
+                    </>
+                  ) : (
+                    <div className="group relative">
+                      <p className="text-3xl font-black text-white/20 mb-1">—</p>
+                      <p className="text-[10px] text-secondary opacity-60">avg quality score</p>
+                      <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1.5 bg-black/90 text-[10px] text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
+                        Sin sugerencias evaluadas con este método aún
+                      </span>
+                    </div>
+                  )}
+                </div>
+                {/* Centroid card */}
+                <div className="glass p-6 border-card-border">
+                  <p className="text-[10px] font-bold text-secondary uppercase tracking-widest mb-2">
+                    Centroid
+                  </p>
+                  {quality.quality_by_method?.centroid != null ? (
+                    <>
+                      <p className="text-3xl font-black text-gold mb-1">
+                        {(quality.quality_by_method.centroid * 100).toFixed(2)}%
+                      </p>
+                      <p className="text-[10px] text-secondary opacity-60">avg quality score</p>
+                    </>
+                  ) : (
+                    <div className="group relative">
+                      <p className="text-3xl font-black text-white/20 mb-1">—</p>
+                      <p className="text-[10px] text-secondary opacity-60">avg quality score</p>
+                      <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1.5 bg-black/90 text-[10px] text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
+                        Sin sugerencias evaluadas con este método aún
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Sección: Categorías destacadas */}
+        {quality && (
+          <div className="mb-8">
+            <h3 className="text-sm font-bold text-secondary uppercase tracking-widest mb-4">
+              Categorías destacadas
+            </h3>
+            {loading ? (
+              <div className="glass p-6 border-card-border">
+                <div className="space-y-3">
+                  {[1, 2, 3].map(i => (
+                    <div key={i} className="h-6 w-full rounded bg-white/5 animate-pulse" />
+                  ))}
+                </div>
+              </div>
+            ) : (quality.top_categories && quality.top_categories.length > 0) ? (
+              <div className="glass p-6 border-card-border overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="border-b border-white/10">
+                      <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-secondary">Categoría</th>
+                      <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-secondary text-right"># Sugerencias</th>
+                      <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-widest text-secondary">Tasa de aprobación</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5">
+                    {quality.top_categories.map((cat) => (
+                      <tr key={cat.category} className="hover:bg-white/[0.02] transition-colors">
+                        <td className="px-4 py-3 text-sm font-medium text-primary capitalize">{cat.category}</td>
+                        <td className="px-4 py-3 text-sm text-primary text-right font-bold">{cat.count}</td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-3">
+                            <div className="flex-1 h-2 bg-white/10 rounded-full overflow-hidden">
+                              <div
+                                className="h-full rounded-full transition-all duration-500"
+                                style={{
+                                  width: `${Math.round(cat.approval_rate * 100)}%`,
+                                  backgroundColor: cat.approval_rate >= 0.5 ? 'var(--color-neon-green)' : 'var(--color-gold)',
+                                }}
+                              />
+                            </div>
+                            <span className="text-xs text-secondary font-mono w-12 text-right">
+                              {Math.round(cat.approval_rate * 100)}%
+                            </span>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="glass p-6 border-card-border text-center">
+                <p className="text-secondary text-sm">Aún no hay categorías registradas</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Sección: Cobertura operativa */}
+        <div className="mb-8">
+          <h3 className="text-sm font-bold text-secondary uppercase tracking-widest mb-4">
+            Cobertura operativa
+          </h3>
+          {loading ? (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {[1, 2, 3].map(i => (
+                <div key={i} className="glass p-5 border-card-border h-28 animate-pulse bg-white/5 rounded" />
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="glass p-5 border-card-border">
+                <p className="text-[10px] font-bold text-secondary uppercase tracking-widest mb-2">
+                  Workspaces con pendientes
+                </p>
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">⏳</span>
+                  <p className="text-3xl font-black text-gold">
+                    {metrics?.coverage?.workspaces_with_pending ?? 0}
+                  </p>
+                </div>
+              </div>
+              <div className="glass p-5 border-card-border">
+                <p className="text-[10px] font-bold text-secondary uppercase tracking-widest mb-2">
+                  Workspaces completamente revisados
+                </p>
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">✅</span>
+                  <p className="text-3xl font-black" style={{ color: 'var(--color-neon-green)' }}>
+                    {metrics?.coverage?.workspaces_fully_reviewed ?? 0}
+                  </p>
+                </div>
+              </div>
+              <div className="glass p-5 border-card-border">
+                <p className="text-[10px] font-bold text-secondary uppercase tracking-widest mb-2">
+                  Tiempo promedio de revisión
+                </p>
+                <p className="text-3xl font-black text-primary">
+                  {metrics?.coverage?.avg_days_to_review != null
+                    ? `${metrics.coverage.avg_days_to_review.toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} días`
+                    : '— días'}
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Sección: Salud del pipeline */}
+        <div className="mb-8">
+          <h3 className="text-sm font-bold text-secondary uppercase tracking-widest mb-4">
+            Salud del pipeline
+          </h3>
+          {loading ? (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {[1, 2, 3].map(i => (
+                <div key={i} className="glass p-5 border-card-border h-28 animate-pulse bg-white/5 rounded" />
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Tasa de éxito */}
+              <div className="glass p-5 border-card-border">
+                <p className="text-[10px] font-bold text-secondary uppercase tracking-widest mb-2">
+                  Tasa de éxito
+                </p>
+                <p className="text-3xl font-black" style={{
+                  color: (() => {
+                    const rate = metrics?.pipeline_health?.success_rate ?? 0
+                    if (rate > 0.8) return 'var(--color-neon-green)'
+                    if (rate >= 0.5) return 'var(--color-gold)'
+                    return '#ef4444'
+                  })()
+                }}>
+                  {metrics?.pipeline_health?.success_rate != null
+                    ? `${(metrics.pipeline_health.success_rate * 100).toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`
+                    : '—'}
+                </p>
+              </div>
+              {/* Duración promedio */}
+              <div className="glass p-5 border-card-border">
+                <p className="text-[10px] font-bold text-secondary uppercase tracking-widest mb-2">
+                  Duración promedio
+                </p>
+                <p className="text-3xl font-black text-primary">
+                  {(() => {
+                    const secs = metrics?.pipeline_health?.avg_duration_seconds
+                    if (secs == null) return '—'
+                    if (secs >= 60) return `${Math.round(secs)} s`
+                    return `${secs.toFixed(1)} s`
+                  })()}
+                </p>
+              </div>
+              {/* Último error */}
+              <div className="glass p-5 border-card-border">
+                <p className="text-[10px] font-bold text-secondary uppercase tracking-widest mb-2">
+                  Último error
+                </p>
+                {metrics?.pipeline_health?.last_failed_reason ? (
+                  <div className="group relative">
+                    <p className="text-xs font-mono text-white/50 line-clamp-2 leading-relaxed">
+                      {metrics.pipeline_health.last_failed_reason}
+                    </p>
+                    <span className="absolute bottom-full left-0 mb-2 px-3 py-2 bg-black/95 text-[10px] text-white rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10 max-w-xs break-words font-mono leading-relaxed whitespace-pre-wrap">
+                      {metrics.pipeline_health.last_failed_reason}
+                    </span>
+                  </div>
+                ) : (
+                  <p className="text-sm" style={{ color: 'var(--color-neon-green)' }}>
+                    Sin errores recientes ✅
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Fila 2: Tendencias */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">

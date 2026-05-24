@@ -190,14 +190,39 @@ export interface MetricsTrends {
   avg_message_count_per_cluster: number
 }
 
+export interface QualityByMethod {
+  llm: number | null
+  centroid: number | null
+}
+
+export interface TopCategoryMetric {
+  category: string
+  count: number
+  approval_rate: number
+}
+
 export interface MetricsQuality {
   evaluated_count: number
   coverage: number
-  avg_overall: number
+  avg_quality_score: number
   avg_claridad: number
   avg_accionabilidad: number
   avg_no_redundancia: number
   avg_naturalidad: number
+  quality_by_method?: QualityByMethod
+  top_categories?: TopCategoryMetric[]
+}
+
+export interface MetricsCoverage {
+  workspaces_with_pending: number
+  workspaces_fully_reviewed: number
+  avg_days_to_review: number
+}
+
+export interface MetricsPipelineHealth {
+  success_rate: number
+  avg_duration_seconds: number
+  last_failed_reason: string | null
 }
 
 export interface DetectorMetrics {
@@ -207,6 +232,8 @@ export interface DetectorMetrics {
   by_category: MetricsByCategory[]
   trends: MetricsTrends
   quality?: MetricsQuality
+  coverage?: MetricsCoverage
+  pipeline_health?: MetricsPipelineHealth
 }
 
 // ── Workspaces ─────────────────────────────────────────────────────────
