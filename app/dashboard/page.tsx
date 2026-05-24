@@ -110,6 +110,7 @@ export default function DetectorDashboard() {
   const overview = metrics?.overview
   const pipeline = metrics?.pipeline
   const trends = metrics?.trends
+  const quality = metrics?.quality
   const totalPending = overview?.pending ?? 0
 
   // El dashboard está vacío cuando: no estamos cargando, no hay error,
@@ -317,6 +318,39 @@ export default function DetectorDashboard() {
             />
           </div>
         </div>
+
+        {/* Fila 1.5: LLM-as-judge */}
+        {quality && quality.evaluated_count > 0 && (
+          <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-8">
+            <MiniStat
+              label="Calidad ★"
+              value={`${Math.round(quality.avg_overall * 100)}%`}
+              sublabel={`media · ${quality.evaluated_count} eval.`}
+              color="var(--color-gold)"
+            />
+            <MiniStat
+              label="Cobertura juez"
+              value={`${Math.round(quality.coverage * 100)}%`}
+              sublabel="sugs evaluadas"
+            />
+            <MiniStat
+              label="Claridad"
+              value={`${Math.round(quality.avg_claridad * 100)}%`}
+            />
+            <MiniStat
+              label="Accionabilidad"
+              value={`${Math.round(quality.avg_accionabilidad * 100)}%`}
+            />
+            <MiniStat
+              label="No redundancia"
+              value={`${Math.round(quality.avg_no_redundancia * 100)}%`}
+            />
+            <MiniStat
+              label="Naturalidad"
+              value={`${Math.round(quality.avg_naturalidad * 100)}%`}
+            />
+          </div>
+        )}
 
         {/* Fila 2: Tendencias */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">

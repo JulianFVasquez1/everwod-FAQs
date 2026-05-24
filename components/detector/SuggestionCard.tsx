@@ -37,20 +37,40 @@ export const SuggestionCard: React.FC<Props> = ({
       style={{ borderLeft: `4px solid ${statusColor}` }}
     >
       <div className="p-5 flex-1">
-        <div className="flex justify-between items-start mb-2">
-          <h3 className="font-bold text-lg text-primary leading-tight pr-12">
+        <div className="flex justify-between items-start mb-2 gap-2">
+          <h3 className="font-bold text-lg text-primary leading-tight">
             {suggestion.suggested_question}
           </h3>
-          <span 
-            className="text-xs font-bold px-2 py-1 rounded bg-white/5"
-            style={{ color: statusColor }}
-          >
-            {confidence}%
-          </span>
+          <div className="flex flex-col items-end gap-1 shrink-0">
+            <span
+              className="text-xs font-bold px-2 py-1 rounded bg-white/5"
+              style={{ color: statusColor }}
+              title="Confianza del clustering (cercanía al centroide)"
+            >
+              conf {confidence}%
+            </span>
+            {typeof suggestion.quality_score === 'number' && (
+              <span
+                className="text-xs font-bold px-2 py-1 rounded bg-white/5"
+                style={{ color: getConfidenceColor(suggestion.quality_score) }}
+                title={
+                  suggestion.quality_breakdown?.reasoning ??
+                  'Score del LLM-juez (promedio de 4 dimensiones)'
+                }
+              >
+                ★ {Math.round(suggestion.quality_score * 100)}%
+              </span>
+            )}
+          </div>
         </div>
 
         <p className="text-xs text-secondary mb-4">
-          {suggestion.message_count} mensajes similares · {suggestion.synthesis_method} · {new Date(suggestion.created_at).toLocaleDateString()}
+          {suggestion.message_count} mensajes similares · {suggestion.synthesis_method}
+          {suggestion.quality_breakdown && (
+            <> · juez: {suggestion.quality_breakdown.judge_model.split('/').pop()}</>
+          )}
+          {' · '}
+          {new Date(suggestion.created_at).toLocaleDateString()}
         </p>
 
         <p className="text-sm text-secondary/80 line-clamp-2 italic">

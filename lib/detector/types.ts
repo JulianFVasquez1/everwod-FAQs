@@ -38,6 +38,15 @@ export interface SimilarExistingFaq {
   similarity: number
 }
 
+export interface QualityBreakdown {
+  claridad: number
+  accionabilidad: number
+  no_redundancia: number
+  naturalidad: number
+  reasoning: string
+  judge_model: string
+}
+
 export interface Suggestion {
   id: number
   workspace_id: number
@@ -56,6 +65,9 @@ export interface Suggestion {
   reviewed_by?: string | null
   sample_messages?: SuggestionMessage[] | null
   similar_existing_faq?: SimilarExistingFaq | null
+  /** Score overall del LLM-juez (0-1). null = no evaluada. */
+  quality_score?: number | null
+  quality_breakdown?: QualityBreakdown | null
 }
 
 export interface SuggestionDetail extends Suggestion {
@@ -178,12 +190,23 @@ export interface MetricsTrends {
   avg_message_count_per_cluster: number
 }
 
+export interface MetricsQuality {
+  evaluated_count: number
+  coverage: number
+  avg_overall: number
+  avg_claridad: number
+  avg_accionabilidad: number
+  avg_no_redundancia: number
+  avg_naturalidad: number
+}
+
 export interface DetectorMetrics {
   overview: MetricsOverview
   pipeline: MetricsPipeline
   by_workspace: MetricsByWorkspace[]
   by_category: MetricsByCategory[]
   trends: MetricsTrends
+  quality?: MetricsQuality
 }
 
 // ── Workspaces ─────────────────────────────────────────────────────────

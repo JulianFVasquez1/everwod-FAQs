@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useSuggestionDetail, useSuggestionActions } from '@/hooks/useDetector'
 import { ApproveModal } from '@/components/detector/ApproveModal'
 import { RejectModal } from '@/components/detector/RejectModal'
+import { QualityBreakdownPanel } from '@/components/detector/QualityBreakdownPanel'
 import { getUser } from '@/lib/auth'
 
 export default function SuggestionDetailPage() {
@@ -99,6 +100,16 @@ export default function SuggestionDetailPage() {
             </section>
           </div>
         </div>
+
+        {/* Panel del LLM-juez (solo si fue evaluada) */}
+        {detail.quality_breakdown && typeof detail.quality_score === 'number' && (
+          <section className="mb-12">
+            <QualityBreakdownPanel
+              overall={detail.quality_score}
+              breakdown={detail.quality_breakdown}
+            />
+          </section>
+        )}
 
         {/* Mensajes del Cluster */}
         <section className="mb-12">
